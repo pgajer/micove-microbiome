@@ -27,6 +27,27 @@ function updateDatasetChoices(){
  const options=choices.map(f=>`<option value="${esc(f.id)}">${esc(f.title)}</option>`).join('')+'<option value="empty">Empty</option><option value="">Load dataset bundle…</option>';
  for(const id of ['datasetSelect','panelDatasetSelect']){el(id).innerHTML=options;el(id).value=activeEmbeddingFamily?.id||META.id}
 }
+// Move the existing widgets, preserving their handlers, values and saved identities.
+let sampleControlHeaderSlots=null;
+function syncSampleControlPlacement(){
+ const sidebar=el('sampleSidePanels'),active=META.id==='lsvf-v3v4-20241111'&&!activeEmbeddingFamily;
+ let controls=el('sampleViewControls');
+ if(active){
+  if(!controls){
+   const widgets=[el('sampleMethod').closest('label'),el('unfoldFaces').closest('label'),el('unfoldAnchor').closest('label'),el('valenciaColorControls'),el('sampleLegendPosition').closest('label')];
+   sampleControlHeaderSlots=widgets.map(node=>{const slot=document.createComment('sample header control');node.before(slot);return {node,slot}});
+   controls=document.createElement('section');controls.id='sampleViewControls';controls.setAttribute('aria-label','Sample view settings');
+   const coloring=document.createElement('details');coloring.id='sampleColoringControls';coloring.open=true;
+   const heading=document.createElement('summary');heading.textContent='Sample coloring';coloring.append(heading,widgets[3]);
+   controls.append(widgets[0],widgets[1],widgets[2],coloring,widgets[4]);sidebar.prepend(controls);
+  }
+  if(el('estimateControls'))el('sampleColoringControls').append(el('estimateControls'));
+ }else if(controls){
+  if(el('estimateControls'))el('sampleSummary').before(el('estimateControls'));
+  for(const {node,slot} of sampleControlHeaderSlots){slot.replaceWith(node)}
+  controls.remove();sampleControlHeaderSlots=null;
+ }
+}
 function datasetPresentation(coverage=META.defaultCoverage){
  document.title='MiCOVE — '+datasetDisplayTitle(META)+(META.analysisKey?' · '+META.populationName+' · '+(activeStateMode==='merged'?'Merged '+coverage+'% cores':'Pure states'):'');el('datasetTitle').textContent='MiCOVE';
  el('datasetSummary').textContent=`${META.description} · ${fmt(populationSize())} ${META.observationLabel} · ${fmt(META.featureCount)} features`;
@@ -40,6 +61,7 @@ function datasetPresentation(coverage=META.defaultCoverage){
  for(const id of ['sampleEmbedding','panelSampleEmbedding'])el(id).options[1].textContent=META.globalLabel||'Global / restricted';
  loadDatasetColors();edgeOrder=new Map(sensitivityPaletteEdges(datasetRegistry.get(META.id)).map((e,i)=>[e.id,i]));updateDatasetChoices();syncAnalysisControls();syncSensitivityControls();
  if(typeof syncAssociations==='function')syncAssociations();
+ syncSampleControlPlacement();
 }
 function resetDatasetSelection(){
  pureCoverageComparison=null;
