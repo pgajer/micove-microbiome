@@ -607,6 +607,18 @@ values. Zero remains a valid value. Undefined estimates use gray `#9ca3af`, with
 their reasons in the legend and hover text. Existing gray background/dimming
 controls take precedence; reference vertices retain their own appearance.
 
+A native vertical response bar is shown beside the 3D scene and included in PNG
+exports. **Relative to response mean** divides nonnegative estimates by the
+observed transformed-response mean (1× is the reference), or subtracts that mean
+for signed/logarithmic targets (zero is the reference). The reference averages
+available transformed responses within each known participant, then averages
+participants equally across the full eligible reference. It is fixed across
+cohort/selection changes, embeddings, estimators and neighborhood sizes. Undefined
+responses are excluded; ratios are disabled for zero or missing means. Relative
+values use the same percentile clipping; hover and CSV include unclipped values.
+These display references are separately versioned metadata; they do not alter
+catalogue predictions or convert them into end-to-end cross-validated estimates.
+
 Binary fields show percentages but are not necessarily disease probabilities:
 for example, assay reporting is conditional on assay availability. The methods
 dialog and feature descriptions retain measurement, imputation and sampling

@@ -63,6 +63,25 @@ must define their denominator features and handling of zeros. These scientific
 choices require producer review; the validator checks that definitions exist,
 not that their prose or parameter values are scientifically appropriate.
 
+A transformation may additionally supply `responseReference` with `mean`,
+`participants`, `records`, `relativeMode` (`ratio` or `difference`), `weighting`
+and `population`. Counts are nonnegative integers; participants cannot exceed
+records or the catalogue population. A finite mean requires answering people;
+null is used when there are none. Ratio mode requires a nonnegative mean, and
+the UI disables division by zero. The reviewed LSVF extension computes each
+participant's available transformed-response mean, then averages people equally.
+Signed and logarithmic targets use differences; nonnegative targets use ratios.
+This population reference is independent of the current sample selection.
+
+`displayReference` records the extension's revision, source manifest and registry
+checksums and arithmetic validation. The scientific catalogue revision and all
+prediction shard hashes remain unchanged. Older catalogues without this metadata
+still have absolute response bars; relative mode explains the missing supplement.
+Native color bars preserve CSS marker colors (including gray context), sample
+coordinates and camera, and appear in PNG exports. Percentiles describe color
+clipping, not uncertainty; CSVs retain the original estimate and add `display_value`,
+`display_mode` and `response_mean`.
+
 Each `series` entry describes one available combination:
 
 - `featureId`, `transformationId`, `geometryId`, `estimatorId`, `estimatorLabel`,

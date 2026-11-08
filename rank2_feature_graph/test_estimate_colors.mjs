@@ -12,7 +12,7 @@ elements.set('samples',plot);
 const replies=new Map(),calls=[];
 const context={console,Map,WeakMap,Set,Number,JSON,Object,Array,Math,String,el,META:{id:'test'},BUNDLE_PACK:{estimateCatalogues:{test:asset},participants:{test:{records}}},DATA:data,
  localStorage:{getItem:()=>null,setItem(){}},sampleColorMode:()=>el('sampleColorScheme').value,esc:x=>String(x),
- VME_ASSETS:{group:async(key,entry)=>replies.get(entry.parts[0].url)},Plotly:{restyle:async(p,updates,indices)=>{calls.push({updates,indices});for(const i of indices)for(const [key,value] of Object.entries(updates)){if(key==='hovertext')p.data[i][key]=value[0];else if(key==='marker.color')p.data[i].marker.color=value[0];else p.data[i][key]=value}}}};
+ VME_ASSETS:{group:async(key,entry)=>replies.get(entry.parts[0].url)},Plotly:{restyle:async(p,updates,indices)=>{calls.push({updates,indices});for(const i of indices)for(const [key,value] of Object.entries(updates)){if(key==='hovertext')p.data[i][key]=value[0];else if(key.startsWith('marker.'))p.data[i].marker[key.slice(7)]=value[0];else p.data[i][key]=value}}}};
 vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('estimate_colors.js',import.meta.url),'utf8'),context);
 const run=code=>vm.runInContext(code,context);
 assert.deepEqual(Array.from(run('estimateLimits([null,-2,0,2],false)')),[-2,2]);
@@ -67,7 +67,7 @@ assert.equal(plot.data[1].marker.color[0],run('estimatePointColor(1)'));
 assert.equal(plot.data[2].marker.color,'red');
 assert.equal(unchanged,JSON.stringify({data,coords:plot.data.map(t=>[t.x,t.y,t.z,t.text,t.meta]),layout:plot.layout}));
 assert.equal(JSON.stringify(selected),selectedBefore);
-assert.ok(calls.every(c=>Object.keys(c.updates).every(k=>['marker.color','hovertext','hovertemplate'].includes(k))));
+assert.ok(calls.every(c=>Object.keys(c.updates).every(k=>['marker.color','hovertext','hovertemplate',...['showscale','colorscale','cauto','cmin','cmax','colorbar'].map(k=>'marker.'+k)].includes(k))));
 console.log('PASS: shared recoloring entry point changes only sample marker colors and hover fields, preserving selection, coordinates, camera and references.');
 
 // Full catalogues must not scan thousands of combinations for every point.
@@ -81,3 +81,23 @@ missing.filter=function(...args){limitScans++;return filter.apply(this,args)};
 for(let i=0;i<100;i++)assert.equal(run('estimatePointColor(0)'),'#9ca3af');
 assert.equal(limitScans,1);
 console.log('PASS: constant-time field lookup and cached all-unsupported color limits.');
+
+// Response baselines change the reported scale, never the saved field or coordinates.
+run('estimateCurrent().row.values=[.2,.8,null];delete estimateCurrent().limits;estimateCurrent().series.transformationId="raw";estimateModel().features.get("f").transformations=[{id:"raw",responseReference:{mean:.4,relativeMode:"ratio",participants:2,records:3}}];estimateModel().relative=true');
+assert.equal(run('estimateDisplay(estimateCurrent()).convert(.8)'),2);
+assert.equal(run('estimateDisplay(estimateCurrent()).format(2)'),'2×');
+assert.match(run('estimateColorbarSpec(estimateCurrent()).colorbar.title.text'),/1× = mean/);
+assert.match(run('estimateColorbarSpec(estimateCurrent()).colorbar.ticktext[0]'),/≤/);
+run('estimateModel().features.get("f").transformations[0].responseReference={mean:-2,relativeMode:"difference"}');
+assert.equal(run('estimateDisplay(estimateCurrent()).convert(-1)'),1);
+assert.match(run('estimateColorbarSpec(estimateCurrent()).colorbar.title.text'),/0 = mean/);
+run('estimateModel().features.get("f").transformations[0].responseReference={mean:0,relativeMode:"ratio"}');
+assert.equal(run('estimateDisplay(estimateCurrent()).mode'),'value');
+const originalColors=JSON.stringify(plot.data.map(t=>t.marker.color));
+const camera=JSON.stringify(plot.layout.scene),coordinates=JSON.stringify(plot.data.map(t=>[t.x,t.y,t.z,t.text]));
+await run('estimateDrawColorbar()');
+assert.equal(plot.data[0].marker.showscale,true);assert.equal(plot.data[1].marker.showscale,undefined);assert.equal(JSON.stringify(plot.data.map(t=>t.marker.color)),originalColors);
+assert.equal(JSON.stringify(plot.layout.scene),camera);assert.equal(JSON.stringify(plot.data.map(t=>[t.x,t.y,t.z,t.text])),coordinates);
+el('sampleColorScheme').value='pure';await run('estimateEnsure()');await run('estimateDrawColorbar()');
+assert.equal(plot.data[0].marker.showscale,null);assert.equal(JSON.stringify(plot.data.map(t=>t.marker.color)),originalColors);
+console.log('PASS: participant-response ratios/differences, zero-reference guard and exportable colorbar preserve samples and camera.');

@@ -27,6 +27,10 @@ REVIEWED['ced1409d8633b388a1707432a6130938190e7de6e06a77fb4c606671ef24536b'] = {
     'releaseStage': 'full',
 }
 
+REVIEWED['b697deea8ca3ab3bc961a876fb16940bdf0f726a9e77d2244f39fddc5b61cd3c'] = {
+    **REVIEWED['ced1409d8633b388a1707432a6130938190e7de6e06a77fb4c606671ef24536b'],
+}
+
 
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""

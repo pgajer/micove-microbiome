@@ -151,6 +151,19 @@ def validate_manifest(manifest, expected):
                         ('label', 'formulaTex', 'description', 'outputUnit', 'zeroPolicy'))
                     and isinstance(transform.get('parameters'), dict),
                     'incomplete transformation definition')
+            if 'responseReference' in transform:
+                ref = transform['responseReference']
+                require(isinstance(ref, dict) and integer(ref.get('participants'))
+                        and integer(ref.get('records')) and ref['participants'] <= ref['records'] <= manifest['sampleCount']
+                        and ref.get('relativeMode') in ('ratio', 'difference')
+                        and text(ref.get('weighting')) and text(ref.get('population')),
+                        'invalid response reference definition')
+                mean = ref.get('mean')
+                require((mean is None and ref['participants'] == 0) or
+                        (isinstance(mean, (float, int)) and not isinstance(mean, bool) and math.isfinite(mean)
+                         and ref['participants'] > 0), 'invalid response reference mean')
+                require(ref['relativeMode'] != 'ratio' or mean is None or mean >= 0,
+                        'signed response reference cannot use ratio')
         transformations[feature['id']] = transforms
     statuses = dict(STATUS_CODES)
     extra = manifest.get('statusCodes', {})

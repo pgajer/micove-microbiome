@@ -83,6 +83,18 @@ class EstimateCatalogueTests(unittest.TestCase):
         self.assertEqual(self.row()['values'][0], 0)
         self.assertIsNone(self.row()['values'][-1])
 
+    def test_response_reference_validation(self):
+        ref = dict(mean=-2., participants=4, records=5, relativeMode='difference',
+                   weighting='Equal participants', population='Full eligible reference')
+        self.manifest['features'][0]['transformations'][0]['responseReference'] = ref
+        self.write(); self.load()
+        ref['relativeMode'] = 'ratio'
+        self.reject('signed response reference')
+        ref['relativeMode'] = 'difference'; ref['mean'] = True
+        self.reject('invalid response reference mean')
+        ref['mean'] = -2.; ref['participants'] = 7
+        self.reject('invalid response reference definition')
+
     def test_swapped_ids_are_rejected_even_with_resealed_files(self):
         self.ids[0], self.ids[1] = self.ids[1], self.ids[0]
         self.reject('sample order')
