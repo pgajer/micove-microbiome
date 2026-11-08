@@ -427,6 +427,58 @@ def validate_correlations(folder, manifest, context):
             require(all(math.isfinite(v) for v in values), 'nonfinite correlation inputs')
 
 
+def validate_profile_embeddings(folder, manifest):
+    """Validate optional frozen sample representations against estimate identities."""
+    descriptors = manifest.get('profileEmbeddings', [])
+    require(isinstance(descriptors, list), 'profile embeddings must be a list')
+    ids = set()
+    for descriptor in descriptors:
+        data = read_json(checked_file(folder, descriptor))
+        require(data.get('format') == 'micove-joint-profile-embedding'
+                and data.get('version') == 1 and text(data.get('id'))
+                and data['id'] == descriptor.get('id') and data['id'] not in ids,
+                'invalid profile embedding identity')
+        ids.add(data['id'])
+        require(all(data.get(k) == manifest.get(k) for k in
+                    ('datasetId', 'sampleOrderSha256', 'sampleCount'))
+                and data.get('catalogueRevision') == manifest['revision']
+                and data.get('correlationRevision') == manifest.get('correlations', {}).get('revision'),
+                'profile embedding dataset differs')
+        records = data.get('recordIndices', [])
+        require(records and all(integer(i) and i < manifest['sampleCount'] for i in records)
+                and len(set(records)) == len(records), 'invalid profile record mapping')
+        snapshot = data.get('snapshot', {})
+        clusters = snapshot.get('clusters', [])
+        require(clusters and all(integer(c.get('id'), 1) and c.get('members') for c in clusters)
+                and len({c['id'] for c in clusters}) == len(clusters), 'invalid frozen clusters')
+        fields = manifest['correlations']['fields']
+        members = [i for c in clusters for i in c['members']]
+        require(all(integer(i) and i < len(fields) for i in members)
+                and len(set(members)) == len(members), 'overlapping or invalid profile features')
+        require(snapshot.get('scope', {}).get('records') == len(records)
+                and data.get('excludedRecords') == manifest['sampleCount'] - len(records)
+                and data.get('weighting') in ('features', 'groups'), 'profile scope or weighting differs')
+        for key, width in [('coordinates', 3), ('profileScores', len(clusters))]:
+            matrix = data.get(key)
+            require(isinstance(matrix, list) and len(matrix) == len(records)
+                    and all(isinstance(row, list) and len(row) == width
+                            and all(number(v) for v in row) for row in matrix),
+                    'invalid profile ' + key)
+        require(all(0 <= v <= 100 for row in data['profileScores'] for v in row),
+                'profile scores must be percentiles')
+        settings, evaluation = data.get('settings', {}), data.get('evaluation', {})
+        require(settings.get('dimension') == 3 and settings.get('backend') == 'sgd'
+                and settings.get('weighting') == data['weighting']
+                and settings.get('matrixSha256') == data.get('inputMatrixSha256'),
+                'profile solver definition differs')
+        require(number(evaluation.get('relativeRms')) and evaluation['relativeRms'] >= 0
+                and evaluation.get('sampled') is False
+                and evaluation.get('profiles') == len(records)
+                and integer(evaluation.get('pairs'), 1) and integer(evaluation.get('zeroPairs'))
+                and evaluation['pairs'] + evaluation['zeroPairs'] == len(records)*(len(records)-1)//2,
+                'profile all-pairs evaluation differs')
+
+
 def load_catalogue(folder, expected):
     """Check all assets while retaining only the small catalogue in memory."""
     folder = Path(folder)
@@ -442,6 +494,7 @@ def load_catalogue(folder, expected):
     for descriptor in context['shards'].values():
         count += validate_shard(read_json(checked_file(folder, descriptor)), descriptor, manifest, context)
     validate_correlations(folder, manifest, context)
+    validate_profile_embeddings(folder, manifest)
     return manifest, dict(samples=len(ids), features=len(manifest['features']),
                           series=count, shards=len(context['shards']))
 

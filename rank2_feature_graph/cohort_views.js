@@ -23,6 +23,7 @@ function samplePanelTitle(method,selection='',cohortOverride=null){
  const key=typeof activeCohort==='undefined'?'all':activeCohort;
  const a=typeof analysisExtension==='function'?analysisExtension():null;
  const cohort=cohortOverride||(key==='all'?'All cohorts':a?.populations?.[key]?.title||META.populationName||key);
+ if(typeof jointEmbeddingActive==='function'&&jointEmbeddingActive())return [cohort,selection].filter(Boolean).join(' · ');
  const population=META.id==='comb-V3V4-tx'&&typeof rebuiltOnlyPopulation==='function'&&rebuiltOnlyPopulation()?'':META.id==='comb-V3V4-tx'
   ? ({baseline:'Current dataset',fixed:'Fixed reference',rebuilt:'Rebuilt reference'}[typeof activeSensitivityMode==='undefined'?'baseline':activeSensitivityMode]||'Current dataset')
   : 'Full dataset';

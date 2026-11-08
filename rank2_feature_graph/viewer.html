@@ -731,7 +731,7 @@ const defaultCamera={eye:{x:1.25,y:1.25,z:1.25},center:{x:0,y:0,z:0},up:{x:0,y:0
 const copyCamera=camera=>JSON.parse(JSON.stringify(camera));
 let pendingSampleCamera=null,pendingGraphCamera=null,sampleRenderedKey=null;
 function readCamera(id){return liveViewCamera(el(id))}
-function sampleViewKey(){return [JSON.stringify(explorationSnapshot()),unfoldedEnabled(),unfoldedEnabled()?unfoldedAnchorFeatureId:null,participant.sampleSize,participant.sampleOpacity,participant.sampleColors,participant.showVertices,participant.vertexLabelSize,pureCoverageActive()?'pure-coverage-'+pureCoverageComparison.nonCore:'',participant.active?participant.key+'|'+participant.embeddingMode+'|'+participant.record+'|'+JSON.stringify(participantBackgroundHighlight)+'|'+participant.colorBy+'|'+participant.matchBackground+'|'+participant.stateBackground+'|'+participant.sphereSize+'|'+participant.labelSize+'|'+participant.vertexLabelSize+'|'+participant.backgroundSize+'|'+participant.lineWidth+'|'+participant.arrowScale+'|'+participant.selectedLabelOnly+'|'+participant.showLabels+'|'+participant.showLines+'|'+participant.showArrows+'|'+participant.showVertices:'',rank3.enabled?JSON.stringify(rank3):'',datasetKey(),el('coverage').value,selectedVertex,selected,el('sampleEmbedding').value,el('sampleColorScheme').value].join('|')}
+function sampleViewKey(){return [typeof jointEmbeddingActive==='function'&&jointEmbeddingActive()?'joint-profiles':'composition',JSON.stringify(explorationSnapshot()),unfoldedEnabled(),unfoldedEnabled()?unfoldedAnchorFeatureId:null,participant.sampleSize,participant.sampleOpacity,participant.sampleColors,participant.showVertices,participant.vertexLabelSize,pureCoverageActive()?'pure-coverage-'+pureCoverageComparison.nonCore:'',participant.active?participant.key+'|'+participant.embeddingMode+'|'+participant.record+'|'+JSON.stringify(participantBackgroundHighlight)+'|'+participant.colorBy+'|'+participant.matchBackground+'|'+participant.stateBackground+'|'+participant.sphereSize+'|'+participant.labelSize+'|'+participant.vertexLabelSize+'|'+participant.backgroundSize+'|'+participant.lineWidth+'|'+participant.arrowScale+'|'+participant.selectedLabelOnly+'|'+participant.showLabels+'|'+participant.showLines+'|'+participant.showArrows+'|'+participant.showVertices:'',rank3.enabled?JSON.stringify(rank3):'',datasetKey(),el('coverage').value,selectedVertex,selected,el('sampleEmbedding').value,el('sampleColorScheme').value].join('|')}
 let sampleRevision=0;function refreshSamples(camera=null){
  if(activeEmbeddingFamily&&familyGraphReady){familySelection.graphMode=activeStateMode;familySelection.graphCoverage=el('coverage').value;syncFamilySelectors();return renderFamily(camera?.eye?camera:familyCamera())}
  applyAutomaticEmbedding();
@@ -742,17 +742,19 @@ let sampleRevision=0;function refreshSamples(camera=null){
  queue=queue.then(async()=>{
   if(revision!==sampleRevision)return;
   if(typeof estimateEnsure==='function')await estimateEnsure();
+  if(typeof jointEmbeddingEnsure==='function')await jointEmbeddingEnsure();
   if(revision!==sampleRevision)return;
   // samples() synchronously normalizes participant embedding controls before rendering.
   const rendering=samples(),key=sampleViewKey();await rendering;sampleRenderedKey=key;
-  if(revision===sampleRevision){if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();renderValenciaLegend();renderCountedSampleLegend();renderSampleStress();}
+  if(revision===sampleRevision){if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();renderValenciaLegend();renderCountedSampleLegend();renderSampleStress();if(typeof jointEmbeddingAfterRender==='function')jointEmbeddingAfterRender();}
   if(revision===sampleRevision&&camera)await Plotly.relayout('samples',{'scene.camera':copyCamera(camera)});
   if(revision===sampleRevision){pendingSampleCamera=null;if(typeof saveDatasetSession==='function')saveDatasetSession()}
  }).catch(e=>{el('sampleStatus').textContent='Sample view error: '+e.message;console.error(e)});return queue;
 }
-function selectionSnapshot(){return {enrollmentExploration:explorationSnapshot(),unfoldFaces:unfoldedEnabled(),unfoldAnchorFeatureId:selectedVertex===null?unfoldedAnchorFeatureId:null,participant:participantSnapshot(),rank3:rank3Snapshot(),edgeFaces:edgeFacesSnapshot(),selected,selectedVertex,hiddenEdges:[...hiddenEdges],embedding:el('sampleEmbedding').value,preferredEmbedding:preferredSampleEmbedding,scope:el('scope').value,graphScope:el('graphScope').value,sampleCamera:copyCamera(activeEmbeddingFamily?familyCamera()||defaultCamera:pendingSampleCamera||(sampleRenderedKey===sampleViewKey()?readCamera('samples'):defaultCamera)),graphCamera:copyCamera(pendingGraphCamera||readCamera('graph3d'))}}
+function selectionSnapshot(){return {jointRepresentation:typeof jointEmbeddingSnapshot==='function'?jointEmbeddingSnapshot():null,enrollmentExploration:explorationSnapshot(),unfoldFaces:unfoldedEnabled(),unfoldAnchorFeatureId:selectedVertex===null?unfoldedAnchorFeatureId:null,participant:participantSnapshot(),rank3:rank3Snapshot(),edgeFaces:edgeFacesSnapshot(),selected,selectedVertex,hiddenEdges:[...hiddenEdges],embedding:el('sampleEmbedding').value,preferredEmbedding:preferredSampleEmbedding,scope:el('scope').value,graphScope:el('graphScope').value,sampleCamera:copyCamera(activeEmbeddingFamily?familyCamera()||defaultCamera:pendingSampleCamera||(sampleRenderedKey===sampleViewKey()?readCamera('samples'):defaultCamera)),graphCamera:copyCamera(pendingGraphCamera||readCamera('graph3d'))}}
 function rememberSelection(){selectionHistory.push(selectionSnapshot());selectionFuture.length=0}
 function restoreSelection(state){
+ if(typeof jointEmbeddingRestore==='function')jointEmbeddingRestore(state.jointRepresentation);
  ++combSelectionRevision;
  explorationRestore(state.enrollmentExploration);
  participantRestore(state.participant);

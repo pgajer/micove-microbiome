@@ -68,6 +68,43 @@ class EstimateCatalogueTests(unittest.TestCase):
     def load(self):
         return load_catalogue(self.root, self.expected)
 
+    def profile_embedding_fixture(self, change=None):
+        self.correlation_fixture()
+        data = dict(format='micove-joint-profile-embedding', version=1, id='joint-test',
+                    datasetId='synthetic', catalogueRevision='catalogue-1',
+                    correlationRevision='correlations-1', sampleCount=6,
+                    sampleOrderSha256=self.expected['sampleOrderSha256'],
+                    recordIndices=list(range(5)), coordinates=[[i, 0, 0] for i in range(5)],
+                    profileScores=[[i*10] for i in range(5)], weighting='features',
+                    excludedRecords=1, inputMatrixSha256='0'*64,
+                    snapshot=dict(scope=dict(records=5), clusters=[dict(id=1, members=[0, 1])]),
+                    settings=dict(dimension=3, backend='sgd', weighting='features', matrixSha256='0'*64),
+                    evaluation=dict(relativeRms=.9, pairs=10, zeroPairs=0, profiles=5, sampled=False))
+        if change:
+            change(data)
+        self.manifest['profileEmbeddings'] = [dict(id='joint-test', **self.descriptor('profile.json', data))]
+        self.write()
+
+    def test_profile_embedding_addition_keeps_existing_values(self):
+        before = copy.deepcopy(self.shards)
+        self.profile_embedding_fixture()
+        self.load()
+        self.assertEqual(before, self.shards)
+
+    def test_profile_embedding_identity_mapping_and_definition_are_checked(self):
+        changes = [lambda d: d.update(catalogueRevision='another'),
+                   lambda d: d.update(recordIndices=[0, 1, 1, 3, 4]),
+                   lambda d: d['coordinates'][1].pop(),
+                   lambda d: d['profileScores'][1].__setitem__(0, 101),
+                   lambda d: d['snapshot']['clusters'][0]['members'].append(0),
+                   lambda d: d['evaluation'].update(pairs=9),
+                   lambda d: d['settings'].update(weighting='groups')]
+        for change in changes:
+            with self.subTest(change=change):
+                self.profile_embedding_fixture(change)
+                with self.assertRaises(ValueError):
+                    self.load()
+
     def correlation_fixture(self, change=None):
         bank=dict(format='micove-estimate-correlations', version=1, revision='correlations-1',
                   datasetId='synthetic', catalogueRevision='catalogue-1',

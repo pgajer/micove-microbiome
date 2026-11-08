@@ -549,6 +549,7 @@ function syncSampleAppearanceControls(referenceAvailable=true){
 }
 function renderSamplePlot(traces,layout,config){
  syncEmbeddingChoices();
+ if(typeof jointEmbeddingActive==='function'&&jointEmbeddingActive())({traces,layout}=jointEmbeddingTransform(traces,layout));
  if(!participant.active){
   const referenceLabel=a=>String(a.name||'').startsWith('endpoint-vertex:');
   const annotations=layout.scene?.annotations||[];
@@ -598,7 +599,7 @@ function highlightParticipantBackground(pair,checked){
 function participantSampleColor(r){const color=participantColorMode()==='visit'?participantVisitColor(r):edgeColor(participantColorPair(r));return typeof samplePaletteColor==='function'?samplePaletteColor(r.index,color,r,r.profile):color}
 async function participantSamples(){
  const rows=participantRows();if(!rows.length){participantRestore(null);return samples()}
- const d=participantData(),b=datasetRegistry.get(META.id),union=participant.embeddingMode==='union',scope=union?currentSubjectEmbeddingScope():null,embeddingMethod=el('sampleEmbedding').value;
+ const d=participantData(),b=datasetRegistry.get(META.id),union=participant.embeddingMode==='union'&&!(typeof jointEmbeddingActive==='function'&&jointEmbeddingActive()),scope=union?currentSubjectEmbeddingScope():null,embeddingMethod=el('sampleEmbedding').value;
  const camera=copyCamera(pendingSampleCamera||readCamera('samples'));let fit=null,z=b.data.samples.coords;
  el('retrySubjectEmbedding').hidden=true;
  if(!union&&datasetMaxNormalizedAsset()&&maxNormalizedIds.includes(embeddingMethod)){const population=datasetMaxNormalizedPopulationView();z=[];population.profiles.forEach((p,i)=>z[p]=population.coordinates[i])}
@@ -628,14 +629,14 @@ async function participantSamples(){
  const ranges=[0,1,2].map(k=>{const a=(union?fit.coords:z).map(p=>p[k]);return [Math.min(...a),Math.max(...a)]}),span=Math.max(...ranges.map(([a,b])=>b-a));
  for(const s of participant.showLines?participantSegments(rows):[]){
   const p=z[s.from.profile],q=z[s.to.profile],delta=q.map((x,i)=>x-p[i]),length=Math.hypot(...delta);
-  traces.push({type:'scatter3d',mode:'lines',x:[p[0],q[0]],y:[p[1],q[1]],z:[p[2],q[2]],line:{color:'#244e5e',width:participant.lineWidth,dash:s.gap?'dash':'solid'},hoverinfo:'text',text:s.from.label+' → '+s.to.label+(s.gap?' (unobserved order positions)':''),showlegend:false});
-  if(participant.showArrows&&length>0)traces.push({type:'cone',x:[p[0]+delta[0]*.72],y:[p[1]+delta[1]*.72],z:[p[2]+delta[2]*.72],u:[delta[0]/length],v:[delta[1]/length],w:[delta[2]/length],sizemode:'absolute',sizeref:Math.min(span*.025,length*.15)*participant.arrowScale,anchor:'tip',colorscale:[[0,'#244e5e'],[1,'#244e5e']],showscale:false,hoverinfo:'skip',showlegend:false});
+  traces.push({type:'scatter3d',mode:'lines',meta:{profileSegment:[s.from.index,s.to.index]},x:[p[0],q[0]],y:[p[1],q[1]],z:[p[2],q[2]],line:{color:'#244e5e',width:participant.lineWidth,dash:s.gap?'dash':'solid'},hoverinfo:'text',text:s.from.label+' → '+s.to.label+(s.gap?' (unobserved order positions)':''),showlegend:false});
+  if(participant.showArrows&&length>0)traces.push({type:'cone',meta:{profileSegment:[s.from.index,s.to.index]},x:[p[0]+delta[0]*.72],y:[p[1]+delta[1]*.72],z:[p[2]+delta[2]*.72],u:[delta[0]/length],v:[delta[1]/length],w:[delta[2]/length],sizemode:'absolute',sizeref:Math.min(span*.025,length*.15)*participant.arrowScale,anchor:'tip',colorscale:[[0,'#244e5e'],[1,'#244e5e']],showscale:false,hoverinfo:'skip',showlegend:false});
  }
  const highlightPairs=new Set(participantBackgroundHighlight?.pairs||[]);
  const highlighted=highlightPairs.size?background.filter(r=>highlightPairs.has(participantBackgroundPair(r))):[];
- if(highlighted.length)traces.push({type:'scatter3d',mode:'markers',...xyz(highlighted),name:'Highlighted background state',marker:{symbol:'circle-open',size:participant.backgroundSize+5,color:'#153f50',opacity:1},hoverinfo:'skip',showlegend:false});
+ if(highlighted.length)traces.push({type:'scatter3d',mode:'markers',meta:{profileRecords:highlighted.map(r=>r.index)},...xyz(highlighted),name:'Highlighted background state',marker:{symbol:'circle-open',size:participant.backgroundSize+5,color:'#153f50',opacity:1},hoverinfo:'skip',showlegend:false});
  const selectedVisit=rows.find(r=>r.index===participant.record);
- if(selectedVisit)traces.push({type:'scatter3d',mode:'markers',meta:{participantSelectedVisit:true},...xyz([selectedVisit]),
+ if(selectedVisit)traces.push({type:'scatter3d',mode:'markers',meta:{participantSelectedVisit:true,profileRecords:[selectedVisit.index]},...xyz([selectedVisit]),
   customdata:['participant:'+selectedVisit.index],name:'Selected visit',
   marker:{symbol:'circle-open',size:Math.max(participant.sphereSize*1.6,participant.sphereSize+8)+6,color:'#000000',opacity:1,line:{color:'#000000',width:2}},
   hoverinfo:'skip',showlegend:false});

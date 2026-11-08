@@ -39,6 +39,7 @@ function cachedEmbeddingStress(key,calculate){
  const value=calculate();if(embeddingStressCache.size>=16)embeddingStressCache.delete(embeddingStressCache.keys().next().value);embeddingStressCache.set(key,value);return value;
 }
 function renderSampleStress(){
+ if(typeof jointEmbeddingStress==='function'&&jointEmbeddingStress())return;
  try{
   const bundle=datasetRegistry.get(META.id),supplement=participantData(),asset=BUNDLE_PACK.stressCompositions?.[META.id],compositions=(asset?.datasetRevision===bundle.dataset.revision?asset.compositions:null)||supplement?.compositions;
   if(!compositions)throw Error('Full target compositions are not supplied for this dataset.');
@@ -79,7 +80,7 @@ function installEmbeddingStress(){
  <p id="embeddingStressScope"></p><p id="embeddingStressEvaluation"></p><p>Every evaluated pair has equal weight. This emphasizes fractional errors at short target distances. It differs from target-normalized RMSE, which divides the sum of squared errors by the sum of squared target distances, and from a sparse solver’s training-stress proxy. A sampled estimate is not an exact all-pairs value, and scores against different target metrics are not a common ranking.</p>`;
  document.body.appendChild(dialog);el('embeddingStressClose').onclick=()=>dialog.close();
  document.addEventListener('click',event=>{const button=event.target.closest?.('.embeddingStress');if(!button)return;const {result,scope}=embeddingStressDetails.get(button.id)||{};
-  el('embeddingStressValue').textContent=button.textContent;el('embeddingStressScope').textContent=(scope||'Diagnostic not yet available.')+(button.id==='sampleStress'&&!participant.active&&!hasSelection()?' '+(maxNormalizedDescription()||(el('sampleEmbedding').value==='reference'?'Combined-reference direct 3D coordinates restricted to the selected population.':META.overviewDescription)||''):'');
+  el('embeddingStressValue').textContent=button.textContent;el('embeddingStressScope').textContent=(scope||'Diagnostic not yet available.')+(button.id==='sampleStress'&&!(typeof jointEmbeddingActive==='function'&&jointEmbeddingActive())&&!participant.active&&!hasSelection()?' '+(maxNormalizedDescription()||(el('sampleEmbedding').value==='reference'?'Combined-reference direct 3D coordinates restricted to the selected population.':META.overviewDescription)||''):'');
   el('embeddingStressEvaluation').textContent=result?`${result.profiles?.toLocaleString()??'—'} profiles; ${result.pairs.toLocaleString()} positive-distance pairs. ${result.sampled?'Sampled estimate'+(Number.isInteger(result.seed)?'; seed '+result.seed:'')+'.':'All profile pairs evaluated.'}${result.zeroPairs?' '+result.zeroPairs+' zero-distance pairs excluded.':''}${result.displayScale&&result.displayScale!==1?' Saved display distances divided by '+result.displayScale.toPrecision(7)+'.':''}`:'';
   dialog.showModal();
  });

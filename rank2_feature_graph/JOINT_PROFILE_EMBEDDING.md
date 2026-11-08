@@ -1,0 +1,136 @@
+# A sample map of joint-cluster profiles
+
+## What question does this view answer?
+
+Do visits with similar combinations of estimated immune, metabolic, taxonomic
+and clinical patterns lie near one another? This representation places **visits**
+in three dimensions. Its input columns are feature-cluster profiles; the 39
+clusters themselves are not the plotted points.
+
+Choose **Representation → Joint cluster profiles · 3D** at the top of the sample
+sidebar. **Taxonomic composition** returns to the existing embeddings. State,
+cohort and participant selections restrict the fixed profile map. They do not
+refit it. Coloring, navigation and PNG export work in either representation.
+Taxonomic reference vertices and face unfolding apply only to composition space.
+
+**Find feature in clusters…** searches recorded feature names. For example,
+“any STI” finds **Any incident STI**, in **C9** of the frozen pilot definition.
+The search shows the feature group, cluster membership and grouped member list.
+Choose **This feature** to color by its saved estimate, or **Cluster profile**
+for the aggregate. When a joint heatmap is open, its current cluster definition
+is separately available; it may differ from the embedding's frozen definition.
+
+## Frozen input and profile definition
+
+The LSVF pilot contains 1,965 visits from 1,144 participants, with 39 profile
+columns. Twenty-six of the dataset's 1,991 visits lack common finite estimate
+support; only this representation omits them. Their original data and maps
+remain available. There are 1,964 distinct profile vectors.
+
+The full-reference feature clustering uses K = 40 nearest-people estimates,
+participant-weighted Spearman correlation, average linkage and Dynamic Tree Cut
+with minimum size 5 and splitting sensitivity 1. It includes all feature groups,
+with one declared transformation per feature. The 1,117 nonconstant fields form
+39 joint clusters. Cluster membership and identifiers are frozen in the asset.
+
+For reference visit r from participant i, give it weight w_r = 1/m_i, where m_i
+is that participant's number of included reference visits. For saved feature
+estimate x_fr, define its weighted midpoint percentile at visit v:
+
+\[
+p_{fv}=100\frac{\sum_r w_r\,[\mathbf1(x_{fr}<x_{fv})+
+\tfrac12\mathbf1(x_{fr}=x_{fv})]}{\sum_r w_r}.
+\]
+
+Here f names a feature, v the visit being scored, and r each reference visit.
+The indicator is one when its condition holds and zero otherwise. Tied values
+receive half their combined reference weight. Every participant contributes
+total weight one to the percentile reference.
+
+For cluster c, the pilot profile S_vc is the ordinary median of its members'
+percentiles at visit v. An even-sized cluster uses the mean of the middle two.
+Every feature has equal weight **within** its cluster. The separate equal-group
+coloring option does not alter the saved embedding. Percentiles and membership
+stay fixed when samples are selected.
+
+The target distance between visits i and j is
+
+\[
+d_{ij}=\sqrt{\sum_{c=1}^{39}(S_{ic}-S_{jc})^2}.
+\]
+
+Every cluster dimension receives equal weight. Scores remain on their original
+0–100 percentile scale: no row normalization, variance standardization,
+whitening or winsorization is applied. Color clipping changes display only.
+
+## Metric MDS and checks
+
+The pilot uses the same primary sparse recipe as the original LSVF Euclidean
+fits: SGD, 200 internally randomized pivots with regional weights, q = 10 local
+neighbors, 800 epochs, one start, preparation/fitting seeds 20261015, and
+centered unscaled three-component PCA initialization. The Zheng schedule uses
+epsilon 0.1. A PCA projection retaining at least 90% variance selects local
+neighbors; all distance targets use the full 39-column matrix. Exact duplicate
+rows share fitting coordinates and are restored to their original visits.
+
+For every unordered visit pair with a positive target distance, evaluate
+
+\[
+E=100\sqrt{\frac1{|P|}\sum_{(i,j)\in P}
+\left(\frac{\|z_i-z_j\|_2-d_{ij}}{d_{ij}}\right)^2}.
+\]
+
+z_i is a visit's saved 3D position; P is the set of evaluated positive-distance
+pairs. E is root mean squared relative distance error, expressed as a percentage.
+Zero means exact preservation. This is distinct from the sparse training proxy.
+
+On all **1,929,629** positive-distance pairs, the fitted error is **19.87%**,
+compared with **35.13%** for the initial three-component PCA projection. One
+zero-distance pair is excluded from relative error. All-pair diagnostics include
+training pairs; they are not a held-out validation study. A separate implementation
+verified the input percentiles/medians and the streamed distance-error calculation.
+Finishing 800 epochs is not a convergence certificate; this pilot tests one start.
+
+The on-screen stress uses the full all-pairs result when the entire supported
+reference is shown. Restricted views evaluate their displayed visits, using a
+reproducible sample of pairs when needed. They retain population coordinates.
+
+## Interpretation
+
+These are **saved neighborhood-smoothed fields**, estimated using the original
+abundance geometry, not independent raw multiomics measurements. Clinical
+outcomes, including STI, and assay-availability diagnostics participate in this
+all-profile map. Coloring by STI describes a component of the constructed space;
+it cannot establish independent association or predictive performance. Separate
+visits remain separate points, not independent participants. Participant weighting
+governs percentiles and correlations; the MDS constraints fit distinct vectors
+without participant weights. Profiles may hide opposing feature patterns.
+
+## Reproduction and distribution
+
+Scientific arrays remain in the separately supplied estimate supplement. Adding
+the representation extends that catalogue without changing its existing fields,
+record identities or embedding banks. Installation validates asset checksums,
+record mappings, cluster membership structure, finite coordinates and evaluation
+counts. Older catalogues remain supported and have no representation selector.
+
+The preparation and fit are explicit, on-demand scientific commands; neither
+installation nor the usual update command runs them:
+
+```sh
+node rank2_feature_graph/prepare_joint_profile_embedding.mjs CATALOGUE NEW_RUN_DIRECTORY features
+Rscript rank2_feature_graph/fit_joint_profile_embedding.R NEW_RUN_DIRECTORY LOCAL_R_PACKAGE_ROOT
+```
+
+The run saves the frozen matrix, membership definition, preparation, complete fit,
+solver settings, runtime/source hashes and pair diagnostics. The fitter loads
+optimized local grip and dgraphs sources and uses one numerical thread. Keep
+completed runs; use a new directory for a changed definition or solver experiment.
+
+Focused data-free UI tests remain on demand:
+
+```sh
+node rank2_feature_graph/test_joint_profile_embedding.mjs
+python3 -m unittest discover -s rank2_feature_graph -p test_estimate_catalogue.py
+python3 -m unittest discover -s scripts -p test_estimate_supplement.py
+```

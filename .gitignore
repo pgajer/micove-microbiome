@@ -177,3 +177,9 @@
 !/rank2_feature_graph/estimate_cluster_profiles.js
 
 !/rank2_feature_graph/test_estimate_cluster_profiles.mjs
+
+!/rank2_feature_graph/joint_profile_embedding.js
+!/rank2_feature_graph/test_joint_profile_embedding.mjs
+!/rank2_feature_graph/prepare_joint_profile_embedding.mjs
+!/rank2_feature_graph/fit_joint_profile_embedding.R
+!/rank2_feature_graph/JOINT_PROFILE_EMBEDDING.md

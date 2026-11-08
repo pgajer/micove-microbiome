@@ -524,3 +524,18 @@ algorithm. The clickable error label documents connected-pair RMS relative error
 with disconnected-pair counts and direct-edge error on hover. Exports preserve
 targets, coordinates, components and diagnostics. Estimates and sample coordinates
 are unchanged.
+
+### Optional joint-profile sample representation
+
+A reviewed catalogue can additionally supply `profileEmbeddings`: checksum-pinned
+JSON files containing frozen record mappings, cluster definitions, the profile
+matrix, 3D coordinates and distance-error diagnostics. These are loaded only when
+requested. Existing fields and taxonomic embedding arrays remain unchanged.
+The sample sidebar exposes **Representation** and **Find feature in clusters…**
+only when a corresponding supplement is installed.
+
+The [joint-profile methods](JOINT_PROFILE_EMBEDDING.md) explain the question,
+percentile aggregation, Euclidean targets, pilot settings/results and limitations.
+Outcome coloring is descriptive when outcome-related profiles also enter the map.
+Changing color profiles, group weights or heatmap clustering does not refit or
+redefine this frozen representation.

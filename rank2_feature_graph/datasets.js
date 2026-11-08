@@ -42,6 +42,7 @@ function syncSampleControlPlacement(){
    controls.append(widgets[0],widgets[1],widgets[2],coloring,widgets[4]);sidebar.prepend(controls);
   }
   if(el('estimateControls'))el('sampleColoringControls').append(el('estimateControls'));
+  if(typeof jointEmbeddingSync==='function')jointEmbeddingSync();
  }else if(controls){
   if(el('estimateControls'))el('sampleSummary').before(el('estimateControls'));
   for(const {node,slot} of sampleControlHeaderSlots){slot.replaceWith(node)}

@@ -88,6 +88,7 @@ function captureNamedViewSettings(includeNeighborhood=true){
  if(selection.unfoldFaces){if(selection.selectedVertex===null)view.unfoldedEdgeRevision=unfoldedEdgeAsset().revision;else view.unfoldedRevision=unfoldedAsset().revision;view.description+=' · Unfolded faces'+(selection.selectedVertex===null?' · Anchor: '+unfoldedAnchorLabel(selection.unfoldAnchorFeatureId):'')}
  if(maxNormalizedIds.includes(selection.embedding)){view.maxNormalizedRevision=maxNormalizedAsset().populationRevision||maxNormalizedAsset().revision;view.description+=' · '+maxNormalizedMethodLabel(maxNormalizedMethod(selection.embedding));if(maxNormalizedIsLocal()){view.maxNormalizedLocalRevision=maxNormalizedLocalLevel().revision;view.description+=' · Local selection'}}
  if(view.pureCoverage)view.description+=' · '+(view.pureCoverage.nonCore?'Non-core samples only (gray)':'Core samples only')+' · Fixed reference';
+ if(selection.jointRepresentation?.choice==='profiles')view.description+=' · Joint cluster profiles (fixed population map; composition settings retained for switching back)';
  if(view.populationComparison!=='baseline')view.description=BUNDLE_PACK.combDisplay.sensitivityLabel+' · '+view.description;
  return view;
 }
@@ -110,6 +111,8 @@ function validateNamedViewCurrent(view){
  validateSphereLighting(view.graphSphereLighting);validateSphereLighting(view.sampleSphereLighting);
  validateAnnotationSettings(view.annotations);
  const bundle=datasetRegistry.get(view.dataset);if(!bundle)throw Error('Load dataset '+view.dataset+' before restoring this view.');
+ const representation=view.selection?.jointRepresentation;
+ if(representation&&(!['composition','profiles'].includes(representation.choice)||representation.choice==='profiles'&&!BUNDLE_PACK.estimateCatalogues?.[view.dataset]?.profileEmbeddings?.some(d=>d.id===representation.id)))throw Error('The saved joint-profile representation is not installed.');
  if(bundle.dataset.revision!==view.datasetRevision)throw Error('Dataset revision differs from this saved view. Load the original bundle to restore it.');
  if(view.graphLabelSize!==undefined&&(!Number.isInteger(view.graphLabelSize)||view.graphLabelSize<6||view.graphLabelSize>24))throw Error('The saved graph label size is invalid.');
  if(view.graphLayout!==undefined&&!Object.hasOwn(graphLayoutLabels,view.graphLayout))throw Error('The saved graph layout is invalid.');

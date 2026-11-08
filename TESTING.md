@@ -346,3 +346,15 @@ address; an explicit dataset link overrides the remembered last dataset. Stored
 selections are checked against dataset/analysis revisions. Clearing browser storage
 or changing the browser/profile or port starts a separate set of preferences.
 File inputs, downloads and open dialogs are transient. Named views remain separate.
+
+Joint-profile sample representation: run
+`node rank2_feature_graph/test_joint_profile_embedding.mjs`, the estimate-catalogue
+Python tests and `scripts/test_estimate_supplement.py` on demand. See
+[methods and reproduction](rank2_feature_graph/JOINT_PROFILE_EMBEDDING.md).
+Check switching representations, graph selections, participant trajectories,
+feature/cluster coloring, reloads and named views in a real browser. No fitting
+or exhaustive layout audit is part of these tests or the usual update command.
+
+The shared-viewer integration harness reports AGP and skin population viewers
+separately as not exercised: they use their own entry points and payload schemas.
+Use their dedicated checks for changes to those viewers.

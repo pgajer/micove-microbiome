@@ -92,6 +92,23 @@ class EstimatePackagingTests(unittest.TestCase):
         self.assertEqual(document['mimeType'], 'application/pdf')
         self.assertEqual(base64.b64decode(document['base64']), raw)
 
+    def test_profile_representation_is_lazy_and_preserves_original_parts(self):
+        self.fixture.profile_embedding_fixture()
+        digest = p.sha((self.folder/'manifest.json').read_bytes())
+        receipt = json.loads((self.folder/'validation.json').read_text())
+        receipt['manifestSha256'] = digest
+        (self.folder/'validation.json').write_text(json.dumps(receipt))
+        with patch.dict('estimate_supplement.REVIEWED', {digest: {**self.fixture.expected, 'releaseStage':'full'}}):
+            attach(self.page, self.folder)
+        entry = p.read_manifest(self.page)['datasets']['synthetic']
+        descriptor = entry['estimateAssets']['representations']['joint-test']
+        self.assertNotIn(descriptor, entry['parts'])
+        self.assertEqual(entry['parts'][:-1], self.original['datasets']['synthetic']['parts'])
+        representation = json.loads(p.checked_bytes(self.web, descriptor))
+        self.assertEqual(representation['recordIndices'], list(range(5)))
+        index = json.loads(p.checked_bytes(self.web, entry['estimateAssets']['index']))['estimateCatalogues']['synthetic']
+        self.assertEqual(index['profileEmbeddings'][0]['http'], descriptor)
+
     def test_invalid_pdf_cannot_replace_page(self):
         before = self.page.read_bytes()
         with self.report_fixture(b'not a PDF'):

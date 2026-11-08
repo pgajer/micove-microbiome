@@ -108,7 +108,7 @@ async function recolorSampleView(){
   if(revision!==sampleRecolorRevision)return;
  }
  if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();
- syncValenciaControls();renderCountedSampleLegend();
+ syncValenciaControls();renderCountedSampleLegend();if(typeof jointEmbeddingSync==='function')jointEmbeddingSync();
  if(typeof syncEstimateCorrelationPanel==='function')table();
  if(typeof sampleRenderedKey!=='undefined')sampleRenderedKey=sampleViewKey();
  if(typeof saveDatasetPanelSettings==='function')saveDatasetPanelSettings();

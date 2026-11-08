@@ -19,8 +19,13 @@ if(!flags.includes('--hover-only')){
  assert(!missing.length,'Integration fixtures missing: '+missing.join(', ')+'. Obtain the matching data package; see TESTING.md.');
  assert(manifest.datasets['comb-V3V4-tx'].deferred?.combDisplay&&manifest.datasets['comb-V3V4-tx'].deferred?.combGraphLayouts,'Integration requires deferred comb-V3V4-tx display and graph-layout assets; see TESTING.md');
 }
+// AGP/skin use separate population-viewer entry points, not switchDataset().
+// Report this boundary explicitly instead of feeding their payloads to the CST validator.
+const standaloneViewers=Object.entries(manifest.datasets).filter(([,entry])=>['agp-population-v1','skin-population-v1','skin-population-v2'].includes(entry.capability)).map(([id])=>id);
+const integratedDatasets=Object.keys(manifest.datasets).filter(id=>!standaloneViewers.includes(id));
+assert(integratedDatasets.includes(manifest.seed.default),'Integration entry must default to the shared CST viewer');
 const read=d=>fs.readFileSync(path.join(base,d.url));
-class Element{constructor(id=''){this.id=id;this.value='';this.children=[];this.dataset={};this.style={};this.options=[{value:""},{value:""},{value:""},{value:""}];this.handlers={};this.textContent='';this.disabled=false;this.classList={add(){},remove(){},toggle(){},contains(){return false}}}setAttribute(k,v){this[k]=v}appendChild(c){this.children.push(c)}after(){}closest(){return this.parentElement??=new Element()}replaceChildren(){this.children=[]}addEventListener(k,f){this.handlers[k]=f}on(k,f){this.handlers[k]=f}close(){this.open=false}}
+class Element{constructor(id=''){this.id=id;this.value='';this.children=[];this.dataset={};this.style={};this.options=[{value:""},{value:""},{value:""},{value:""}];this.handlers={};this.textContent='';this.disabled=false;this.classList={add(){},remove(){},toggle(){},contains(){return false}}}setAttribute(k,v){this[k]=v}appendChild(c){this.children.push(c)}append(...children){children.forEach(c=>this.appendChild(c))}prepend(...children){this.children.unshift(...children)}after(){}closest(){return this.parentElement??=new Element()}replaceChildren(){this.children=[]}addEventListener(k,f){this.handlers[k]=f}on(k,f){this.handlers[k]=f}close(){this.open=false}}
 const elements=new Map(),el=id=>{if(!elements.has(id))elements.set(id,new Element(id));return elements.get(id)};
 for(const [id,value] of Object.entries({coverage:'60',dimension:'3',graphScope:'all',sampleEmbedding:'local',scope:'core',search:''}))el(id).value=value;
 for(const id of ['unfoldFaces','panelUnfoldFaces','unfoldAnchor'])el(id).parentElement={title:''};
@@ -46,11 +51,11 @@ assert.equal(requests.length,manifest.datasets[initial].parts.length,'Only initi
 assert.equal(run('referenceTaxonLabels.size')>0,true,'Shared label dictionary is available without V3V4 data');
 const bookmark=clone(await run('captureNamedView()'));ctx.initialView=bookmark;
 // Slow first selection cannot override a later selection of the already-loaded dataset.
-const other=Object.keys(manifest.datasets).find(id=>id!==initial);let release;gate={urls:new Set(manifest.datasets[other].parts.map(x=>x.url)),promise:new Promise(r=>release=r)};
+const other=integratedDatasets.find(id=>id!==initial);let release;gate={urls:new Set(manifest.datasets[other].parts.map(x=>x.url)),promise:new Promise(r=>release=r)};
 ctx.other=other;const slow=run('switchDataset(other)');await new Promise(r=>setTimeout(r,10));await run('switchDataset(initialView.dataset)');release();await slow;gate=null;assert.equal(run('META.id'),initial);
 const visited=[],optionalChecks={};
-for(const id of Object.keys(manifest.datasets)){
- ctx.id=id;await run('switchDataset(id)');await flush();assert.equal(run('META.id'),id);assert.equal(run('graphEmbeddingJobs.size'),0);visited.push(id);
+for(const id of integratedDatasets){
+ ctx.id=id;try{await run('switchDataset(id)');await flush()}catch(error){throw new Error('Dataset switch failed for '+id,{cause:error})}assert.equal(run('META.id'),id);assert.equal(run('graphEmbeddingJobs.size'),0);visited.push(id);
  // Validate installed VALENCIA2 assignments through the actual color/export functions.
  run(`{const asset=valenciaAsset();if(asset){
   const savedMode=el('sampleColorScheme').value,before=JSON.stringify(asset);
@@ -92,7 +97,7 @@ run(`{
 }`);
 if(process.argv.includes('--hover-only')){
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({status:'PASS',datasets:visited,checks:['every sample hover matches uncached membership formatting','coverage changes invalidate hover membership','all datasets admitted and switched']},null,2));
+ console.log(JSON.stringify({status:'PASS',datasets:visited,standaloneViewersNotExercised:standaloneViewers,checks:['every sample hover matches uncached membership formatting','coverage changes invalidate hover membership','all shared-viewer datasets admitted and switched']},null,2));
  process.exit(0);
 }
 // Selection must not download participant-only geometry for any dataset.
@@ -640,4 +645,4 @@ if(run('!!unfoldedEdgeAsset()')){
 await run('switchDataset(initialView.dataset)');
 const count=requests.length;await run('ensureSensitivityLoaded("rebuilt");ensureEmbeddingFamiliesLoaded()');await run('switchDataset(initialView.dataset)');assert.equal(requests.length,count,'Loaded assets are reused');
 assert.deepEqual(errors,[]);
-console.log(JSON.stringify({status:'PASS',mode:auditLayouts?'integration-and-layout-audit':'integration',elapsedSeconds:Number(((performance.now()-started)/1000).toFixed(2)),datasets:visited,requests:count,initialRequests:manifest.datasets[initial].parts.length,deferredGraphs,displayChecks,populationChecks,pureCounts,optionalChecks,checks:['eight deferred graph settings and saved geometry restored','all datasets admitted and switched','stale selection suppressed','saved cameras restored','deferred joint fits fetched without refitting and four saved participant views restored','available populations and saved views checked; unavailable populations rejected','shared labels preserved','no scientific bundle mutation','loaded assets reused']},null,2));
+console.log(JSON.stringify({status:'PASS',mode:auditLayouts?'integration-and-layout-audit':'integration',elapsedSeconds:Number(((performance.now()-started)/1000).toFixed(2)),datasets:visited,standaloneViewersNotExercised:standaloneViewers,requests:count,initialRequests:manifest.datasets[initial].parts.length,deferredGraphs,displayChecks,populationChecks,pureCounts,optionalChecks,checks:['eight deferred graph settings and saved geometry restored','all shared-viewer datasets admitted and switched','stale selection suppressed','saved cameras restored','deferred joint fits fetched without refitting and four saved participant views restored','available populations and saved views checked; unavailable populations rejected','shared labels preserved','no scientific bundle mutation','loaded assets reused']},null,2));

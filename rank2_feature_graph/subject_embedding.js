@@ -80,10 +80,12 @@ function subjectEmbeddingAnnotations(scope,fit){
  });
 }
 function captureSubjectEmbeddingFit(){
+ if(typeof jointEmbeddingActive==='function'&&jointEmbeddingActive())return null;
  if(!participant.active||participant.embeddingMode!=='union')return null;
  const scope=currentSubjectEmbeddingScope();return copyCamera(validateSubjectEmbeddingFit(savedSubjectEmbedding(scope),scope));
 }
 function validateNamedSubjectEmbedding(view,bundle){
+ if(view.selection?.jointRepresentation?.choice==='profiles'){if(view.subjectEmbeddingFit!=null)throw Error('Unexpected taxonomic local fit in a joint-profile view');return}
  const p=view.selection?.participant;
  if(p?.active&&p.embeddingMode==='union'){
   const d=BUNDLE_PACK.participants[view.dataset],scope=subjectEmbeddingScope(bundle,d,view.cohort,view.stateMode,view.coverage,p.key);
