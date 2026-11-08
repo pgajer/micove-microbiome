@@ -422,3 +422,42 @@ one lazy shard per target. No full array catalogue is loaded into the browser.
 The uncompressed scientific export is about 2.85 GB and is supplied separately;
 software updates remember the installed export path. Full validation and asset
 integrity checks run when packaging the supplement, without fitting models.
+
+### Metric-MDS cluster graph layout
+
+**Layout** offers Circular / bipartite (the existing default) and **2D metric
+MDS**. The choice is saved with the correlation settings. MDS uses every pair
+of node feature sets in that panel, including same-side pairs of a between-group
+panel. A pair's target is `sqrt(2 * (1 - mean signed correlation))`, excluding
+feature self-pairs; identical feature sets have target zero. These aggregated
+dissimilarities need not be Euclidean or satisfy the triangle inequality.
+Only the normal within-group or cross-group graph edges are drawn. Between-group
+MDS uses circles for row nodes and squares for column nodes, with equal area
+scaling for the feature counts.
+
+A single browser worker performs full-pair SGD: three starts, seed 20261108,
+500 epochs, exponentially decreasing learning rate 0.3 to 0.002. Keep the lowest
+raw-stress checkpoint (initial and every ten epochs), after least-squares uniform
+scaling. This portable implementation is independent of the R package. Cache
+identity includes exact target inputs and solver source. Finishing the epoch
+budget does not establish convergence. Prediction estimates, heatmap values,
+cluster membership and sample coordinates are not changed by this layout.
+
+Each graph reports RMS relative distance error in percent over all positive
+node-pair targets, including hidden edges and degree-zero nodes. The error is
+not sample-embedding stress or a significance measure. The clickable label opens
+formulas and definitions in Methods; its tooltip also gives target-normalized
+RMSE, solver settings and the maximum absolute error for zero targets. Zero
+pairs enter fitting but are excluded from relative error. No positive targets
+means that relative error is unavailable. Screen coordinates use isotropic
+scaling. Threshold and sign changes do not refit or move nodes; field/group or
+clustering changes can change targets and require another fit.
+
+With MDS selected, the ZIP additionally contains each panel's coordinates,
+all pair target/fitted distances, raw stress and error diagnostics, seed,
+starts, epochs and best checkpoint. The exact solver source is included once.
+Diagnostics panels are fitted for export even if collapsed. Existing node/edge
+CSVs keep their visibility fields. These small display fits are on demand and
+never run in the installer or update command.
+
+Focused check: `node rank2_feature_graph/test_estimate_correlation_layout.mjs`.
