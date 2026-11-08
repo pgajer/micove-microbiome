@@ -4,11 +4,14 @@ This module performs no statistical estimation, admission or imputation. The
 caller supplies a trusted identity receipt for the existing dataset release.
 """
 import argparse
+import array
+import base64
 import hashlib
 import json
 import math
 from pathlib import Path, PurePosixPath
 import re
+import sys
 
 
 HASH = re.compile(r'[a-f0-9]{64}')
@@ -388,6 +391,40 @@ def validate_correlations(folder, manifest, context):
                     and a != b and a not in used and b not in used and 0 <= distance <= 2
                     and size == sizes[int(a)] + sizes[int(b)], 'invalid linkage children')
             used.update((a, b)); sizes.append(int(size))
+    selection = item.get('selectionInputs')
+    if selection is not None:
+        require(isinstance(selection, dict) and text(selection.get('revision')), 'invalid correlation input revision')
+        descriptors = selection.get('banks')
+        require(isinstance(descriptors, list) and len(descriptors) == len({b['k'] for b in banks}), 'incomplete correlation inputs')
+        seen = set()
+        common = None
+        for descriptor in descriptors:
+            k = descriptor.get('k')
+            require(k in {b['k'] for b in banks} and k not in seen, 'invalid correlation input K')
+            seen.add(k)
+            data = read_json(checked_file(folder, descriptor))
+            require(data.get('format') == 'micove-correlation-inputs' and data.get('version') == 1
+                    and data.get('revision') == selection['revision'] and data.get('k') == k
+                    and data.get('datasetId') == manifest['datasetId'] and data.get('catalogueRevision') == manifest['revision']
+                    and data.get('sampleOrderSha256') == manifest['sampleOrderSha256'], 'correlation input identity differs')
+            records, groups = data.get('recordIndices'), data.get('participantGroups')
+            require(isinstance(records, list) and len(records) == item['records']
+                    and all(integer(i) and i < manifest['sampleCount'] for i in records)
+                    and records == sorted(set(records)), 'invalid correlation input records')
+            require(isinstance(groups, list) and len(groups) == len(records)
+                    and all(integer(g) for g in groups) and len(set(groups)) == item['participants'], 'invalid correlation participants')
+            require(common is None or common == (records, groups), 'correlation input support differs')
+            common = (records, groups)
+            require(data.get('featureIds') == [f['featureId'] for f in fields]
+                    and data.get('encoding') == 'float64-le-feature-major', 'correlation input feature order/encoding differs')
+            try:
+                raw = base64.b64decode(data.get('valuesBase64', ''), validate=True)
+            except (ValueError, TypeError) as exc:
+                raise ValueError('invalid correlation input encoding') from exc
+            require(len(raw) == 8*len(records)*len(fields), 'correlation input dimensions differ')
+            values = array.array('d'); values.frombytes(raw)
+            if sys.byteorder != 'little': values.byteswap()
+            require(all(math.isfinite(v) for v in values), 'nonfinite correlation inputs')
 
 
 def load_catalogue(folder, expected):

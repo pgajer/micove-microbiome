@@ -156,3 +156,5 @@
 !/rank2_feature_graph/estimate_correlations.js
 
 !/rank2_feature_graph/test_estimate_correlations.mjs
+
+!/rank2_feature_graph/estimate_correlation_compute.js

@@ -629,7 +629,10 @@ measurements. Preferences are stored by dataset and catalogue revision. See [cat
 
 LSVF estimate-correlation heatmaps use a fixed signed scale from −1 (blue) through
 zero (near white) to +1 (red). They compare original saved estimates, independent
-of response color clipping, relative mode and 3D selection. Columns carry feature-
+of response color clipping and relative mode. Follow graph selection restricts
+correlations and feature clusters to a selected state or visible vertex union in
+the active cohort, excluding unrelated background. Clearing selection or unchecking
+the option restores the full reference; original estimates remain unchanged. Columns carry feature-
 group and joint-cluster strips, with names and cluster IDs also in hover/table
 text. Constant fields are explicitly excluded. Selecting a feature recolors the
 current sample view with its declared transformation and shared neighborhood K;

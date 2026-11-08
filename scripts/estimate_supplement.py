@@ -36,6 +36,11 @@ REVIEWED['5d7678220f60043823b8f86a7d9d06408b46bf1cda6edfabd03afccf56a0423a'] = {
 }
 
 
+REVIEWED['2f8636bef216a3921d7c2cd237f44fb2ab3a71e1fcf32f3c096e62b61fc0c267'] = {
+    **REVIEWED['5d7678220f60043823b8f86a7d9d06408b46bf1cda6edfabd03afccf56a0423a'],
+}
+
+
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
     if isinstance(value, dict):
@@ -113,6 +118,10 @@ def attach(page_path, folder):
         shards[descriptor['id']] = http
     correlations = {}
     for descriptor in packaged.get('correlations', {}).get('banks', []):
+        http = publish(read_json(checked_file(folder, descriptor)))
+        descriptor['http'] = http
+        correlations[descriptor['id']] = http
+    for descriptor in packaged.get('correlations', {}).get('selectionInputs', {}).get('banks', []):
         http = publish(read_json(checked_file(folder, descriptor)))
         descriptor['http'] = http
         correlations[descriptor['id']] = http

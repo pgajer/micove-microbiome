@@ -64,7 +64,7 @@ class EstimatePackagingTests(unittest.TestCase):
         return patch.dict('estimate_supplement.REVIEWED', {digest: {**self.fixture.expected, 'releaseStage': 'full'}})
 
     def test_correlation_banks_are_lazy_checked_assets(self):
-        self.fixture.correlation_fixture()
+        self.fixture.selection_input_fixture()
         digest=p.sha((self.folder/'manifest.json').read_bytes())
         receipt=json.loads((self.folder/'validation.json').read_text())
         receipt['manifestSha256']=digest
@@ -79,6 +79,9 @@ class EstimatePackagingTests(unittest.TestCase):
         index=json.loads(p.checked_bytes(self.web,entry['estimateAssets']['index']))['estimateCatalogues']['synthetic']
         self.assertEqual(index['correlations']['banks'][0]['http'],descriptor)
         self.assertEqual(entry['parts'][:-1],self.original['datasets']['synthetic']['parts'])
+        inputs=entry['estimateAssets']['correlations']['selection-2']
+        self.assertNotIn(inputs,entry['parts'])
+        self.assertEqual(json.loads(p.checked_bytes(self.web,inputs))['participantGroups'],[0,0,1,2,3])
 
     def test_pdf_report_preserves_binary_bytes(self):
         raw = b'%PDF-1.4\n%\x80\xff binary fixture\n%%EOF'

@@ -105,8 +105,23 @@ visit count. Checked averages each person's fields across visits before equal-
 person correlation. Weighted Spearman uses weighted mid-distribution ranks and
 weighted Pearson correlation of those ranks; exact ties share a rank.
 
-Use unclipped saved estimates. Relative color scales and current 3D selection
-do not change the heatmap. Complete linkage of `1 - correlation`, cut at `1 - t`,
+Use unclipped saved estimates. Relative color scales do not change the heatmap.
+**Follow graph selection** is initially on: an edge restricts correlations to its
+samples in the current cohort, and a vertex to its visible incident-state union.
+Unrelated background samples and reference markers are excluded. Clear the graph
+selection or uncheck this option to restore the full eligible reference.
+Only selected visits contribute in either counting mode; recompute participant
+means, equal-person weights, ranks and clusters within the selection. The original
+response estimates remain fixed, with no refitting within a state.
+
+Optional `selectionInputs` banks contain one compact, finite float64 little-endian
+feature-major array per K, alongside checked feature order, eligible record
+indices and participant-group IDs. They preserve exact saved estimate values.
+A cancellable background worker computes subset correlations and complete linkage;
+only three recent subset results are cached. At least three eligible participants
+are required. Exclude constant fields separately for each subset. Tied distances
+can make clusters sensitive to floating-point rounding; use deterministic nearest-
+neighbor chains with previous-member then frozen-feature-order tie preference. Complete linkage of `1 - correlation`, cut at `1 - t`,
 gives clusters with every within-cluster correlation at least `t`. Negative
 correlations remain visible without joining positive clusters. Clustering uses
 all nonconstant fields jointly; group, search and cluster filters affect display
@@ -122,7 +137,8 @@ and correlation revision.
 **Download results ZIP** includes the displayed correlation matrix, assignments
 for every feature (including exclusions and a visibility flag), exact settings
 and source checksums, a README, and an HTML methods page with formulas. The methods
-page is also available in the panel and can be printed/saved as PDF. Correlations
+Selected-subset exports also include `selected_samples.csv` with sample IDs and
+common-support inclusion flags. The methods page is also available in the panel and can be printed/saved as PDF. Correlations
 describe smoothed fields, not underlying-feature association tests or calibrated
 risk. Shared neighborhoods, compositional constraints, assay substitutions and
 larger K can create or strengthen concordance. No naive p-values are supplied.

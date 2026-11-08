@@ -88,6 +88,28 @@ class EstimateCatalogueTests(unittest.TestCase):
         self.load()
         self.assertEqual(before,self.shards)
 
+    def selection_input_fixture(self, change=None):
+        import base64, struct
+        self.correlation_fixture()
+        data=dict(format='micove-correlation-inputs',version=1,revision='input-1',
+                  datasetId='synthetic',catalogueRevision='catalogue-1',sampleOrderSha256=self.expected['sampleOrderSha256'],
+                  k=2,encoding='float64-le-feature-major',featureIds=[f['id'] for f in self.manifest['features']],
+                  recordIndices=[0,1,2,3,4],participantGroups=[0,0,1,2,3],
+                  valuesBase64=base64.b64encode(struct.pack('<10d',*range(10))).decode())
+        if change:change(data)
+        self.manifest['correlations']['selectionInputs']=dict(revision='input-1',banks=[
+            dict(id='selection-2',k=2,**self.descriptor('correlations/input.json',data))])
+        self.write()
+
+    def test_selection_inputs_match_identity_order_and_common_support(self):
+        self.selection_input_fixture();self.load()
+        for change,message in [(lambda d:d.update(recordIndices=[0,0,2,3,4]),'records'),
+                               (lambda d:d.update(featureIds=list(reversed(d['featureIds']))),'feature order'),
+                               (lambda d:d.update(valuesBase64='AAAA'),'dimensions'),
+                               (lambda d:d.update(participantGroups=[0]*5),'participants')]:
+            self.selection_input_fixture(change)
+            with self.assertRaisesRegex(ValueError,message):self.load()
+
     def test_correlation_mismatched_population_rejected(self):
         self.correlation_fixture(lambda b:b.update(sampleOrderSha256='0'*64))
         with self.assertRaisesRegex(ValueError,'identity'):self.load()

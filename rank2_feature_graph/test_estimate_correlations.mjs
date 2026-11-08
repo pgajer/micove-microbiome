@@ -35,3 +35,23 @@ assert.equal(element.value,'estimate:x');assert.equal(model.choices.x,'a40');ass
 assert.equal(JSON.stringify({selection,coordinates}),before);
 assert.match(run('estimateCorrelationMethodsHtml()'),/<math>/);
 console.log('PASS: packed matrix, non-chaining complete-linkage threshold, exports, undefined constants, formulas and recolor-only selection.');
+
+// Graph membership follows the active cohort and visible incident states, not context traces.
+context.localStorage={getItem:()=>null,setItem(){}};
+asset.categories=[{id:'x'},{id:'y'}];asset.sampleIds=['a','b','c','d'];
+model.ids=new Map(asset.sampleIds.map((id,i)=>[id,i]));
+context.META={id:'synthetic',populationName:'Current cohort'};
+context.DATA={records:asset.sampleIds.map(id=>({id})),samples:{pair:['1,2','1,3','2,3','1,2']}};
+context.eligibleIndices=()=>[0,1,2];context.selected='1,2';context.selectedVertex=null;
+context.current=()=>({nodes:[{id:1,label:'Anchor'}],edges:[{id:'1,2',label:'A + B'}]});
+context.visibleIncidentEdges=()=>[{id:'1,2'},{id:'1,3'}];
+context.el=id=>id==='coverage'?{value:'70'}:id==='cohortSelect'?{value:'cohort'}:element;
+assert.deepEqual(Array.from(run('estimateCorrelationScope().recordIndices')),[0]);
+context.selected=null;context.selectedVertex=1;
+assert.deepEqual(Array.from(run('estimateCorrelationScope().recordIndices')),[0,1]);
+context.visibleIncidentEdges=()=>[{id:'1,3'}];
+assert.deepEqual(Array.from(run('estimateCorrelationScope().recordIndices')),[1]);
+run('estimateCorrelationState().follow=false');assert.equal(run('estimateCorrelationScope().kind'),'full');
+run('estimateCorrelationState().follow=true');context.selectedVertex=null;
+assert.equal(run('estimateCorrelationScope().kind'),'full');
+console.log('PASS: selected edge/vertex membership, cohort restriction, hidden incident states and full-reference toggle.');
