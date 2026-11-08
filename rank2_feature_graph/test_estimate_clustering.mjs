@@ -35,3 +35,34 @@ for(const filename of process.argv.slice(2)){
  }
 }
 console.log(`PASS: adaptive clusters, unassigned fields, parameter bounds, input preservation; ${comparisons} optional reference partitions.`);
+
+// Group separation must rebuild each group's tree, not split a joint partition.
+const groupCluster=context.clusterEstimateCorrelationGroups;
+const small={featureIndices:[0,1,2,3],correlations:[.99,.2,.1,.1,.3,.98]};
+const groupIds=['x','y','x','y'],settings={clustering:'threshold',threshold:.7,minSize:5,deepSplit:1,groupIds};
+const separate=groupCluster(small,settings),joint=groupCluster(small,{...settings,clusteringScope:'joint'});
+assert.equal(new Set(separate.labels).size,4,'Within-group weak correlations produce four singletons');
+assert.equal(joint.labels[0],joint.labels[1]);assert.equal(joint.labels[2],joint.labels[3]);
+assert.equal(separate.groups.length,2);assert.equal(separate.scope,'separate');
+assert.deepEqual(Array.from(separate.groups[0].indices),[0,2]);
+assert.throws(()=>groupCluster(small,{...settings,groupIds:['x']}),/group IDs/);
+const groupedBank={featureIndices:Array.from({length:38},(_,i)=>i),correlations:[]};
+for(let i=0;i<38;i++)for(let j=i+1;j<38;j++){
+ const a=i%19,b=j%19;
+ const sameGroup=Math.floor(i/19)===Math.floor(j/19);
+ groupedBank.correlations.push(sameGroup?(a===18||b===18?-.8:Math.floor(a/6)===Math.floor(b/6)?.94-(a+b)*.00001:.05+(a+b)*.00001):.9-(a+b)*.00001);
+}
+const groupSettings={clustering:'dynamic',minSize:5,deepSplit:1,groupIds:groupedBank.featureIndices.map(i=>i<19?'x':'y')};
+const preserved=JSON.stringify(groupedBank),grouped=groupCluster(groupedBank,groupSettings);
+assert.equal(JSON.stringify(groupedBank),preserved);
+for(const g of grouped.groups)for(let i=0;i<19;i++){
+ assert.equal(!g.labels[i],!fit.labels[i]);
+ for(let j=0;j<i;j++)assert.equal(g.labels[i]===g.labels[j],fit.labels[i]===fit.labels[j]);
+}
+assert(!grouped.labels.slice(0,19).filter(Boolean).some(c=>grouped.labels.slice(19).includes(c)),'Group cluster IDs are distinct');
+const changed=JSON.parse(preserved);let packed=0;
+for(let i=0;i<38;i++)for(let j=i+1;j<38;j++,packed++)if((i<19)!==(j<19))changed.correlations[packed]=-.95;
+assert.deepEqual(Array.from(groupCluster(changed,groupSettings).labels),Array.from(grouped.labels),'Between-group changes cannot change separate clusters');
+const tiny=groupCluster(small,{...settings,clustering:'dynamic'});assert(tiny.labels.every(c=>c===0),'Small groups stay visible but unassigned');
+assert.deepEqual(Array.from(groupCluster(bank,{clusteringScope:'joint',clustering:'dynamic',minSize:5,deepSplit:1}).labels),Array.from(fit.labels),'Joint mode preserves the existing fit');
+console.log('PASS: independent group hierarchies, rebuilt complete linkage, unique cluster IDs, tiny groups, between-group invariance, unchanged banks, and preserved joint fits.');

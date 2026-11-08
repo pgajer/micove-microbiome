@@ -182,3 +182,35 @@ const graphFiles=run('estimateCorrelationFiles(estimateCorrelationShown)').filte
 assert.equal(graphFiles.length,6);assert.match(graphFiles[0].text,/feature_count/);assert.match(graphFiles[1].text,/positive_fraction.*negative_fraction.*displayed/);
 assert.equal(run('estimateCorrelationState().graphThreshold'),.3);assert.equal(run('estimateCorrelationState().graphSign'),'both');
 console.log('PASS: signed graph means/cancellation, pair counts, same-cluster bipartite edges, singletons/unassigned, sign/threshold filters, linked lower-triangle highlights, graph exports, and unchanged scientific state.');
+
+run('groupReps=estimateCorrelationGroupRepresentatives(bank,[7,7,7],data);groupView={bank,data,labels:[7,7,7],representatives:estimateCorrelationRepresentatives(bank,[7,7,7],data),groupRepresentatives:groupReps}');
+assert.equal(run('estimateCorrelationFieldRepresentative(groupView,0).featureId'),'a','Group X representative is from X, not global representative B');
+assert.equal(run('estimateCorrelationFieldRepresentative(groupView,1).featureId'),'b');
+assert.equal(run('estimateCorrelationFieldRepresentative(groupView,2).featureId'),'a','Group search does not rename representative');
+run('groupGraph=estimateCorrelationGraph({rows:[0,2],cols:[1],symmetric:false},groupView)');
+assert.match(run('groupGraph.nodes[0].label'),/One, "quoted"/);assert.match(run('groupGraph.nodes[1].label'),/Two/);
+assert.equal(run('groupGraph.nodes[0].cluster===groupGraph.nodes[1].cluster'),true,'Joint ID stays shared while labels become group-specific');
+run('separatePanels=estimateCorrelationPanels(asset,bank,{rows:"x",cols:"all",cluster:"2",clusteringScope:"separate"},[0,1,2],[2,1,2],[0,2])');
+assert.deepEqual(Array.from(run('separatePanels[1].cols')),[1],'Selecting an independent focus cluster keeps comparison-group columns');
+assert.equal(run('estimateCorrelationState().clusteringScope'),'separate');
+// Older preferences migrate to Separate and discard now-stale cluster IDs;
+// an explicit later Joint choice and its valid display selection are retained.
+const savedAsset={...asset};context.estimateAsset=()=>savedAsset;context.localStorage.getItem=()=>JSON.stringify({cluster:'99',minSize:8,graphThreshold:.4});
+assert.equal(run('estimateCorrelationState().clusteringScope'),'separate');assert.equal(run('estimateCorrelationState().cluster'),'all');assert.equal(run('estimateCorrelationState().minSize'),8);assert.equal(run('estimateCorrelationState().graphThreshold'),.4);
+context.estimateAsset=()=>({...asset});context.localStorage.getItem=()=>JSON.stringify({clusteringScope:'joint',cluster:'7'});
+assert.equal(run('estimateCorrelationState().clusteringScope'),'joint');assert.equal(run('estimateCorrelationState().cluster'),'7');context.estimateAsset=()=>asset;
+run('groupExportView={...estimateCorrelationShown,...groupView,state:{...estimateCorrelationShown.state,clusteringScope:"separate"},clustering:{scope:"separate",method:"threshold",groups:[{categoryId:"x",indices:[0,2],labels:[7,7],linkage:[[0,1,.8,2]]},{categoryId:"y",indices:[1],labels:[8],linkage:[]}]}}');
+const groupExports=run('estimateCorrelationFiles(groupExportView)');
+assert.equal(groupExports.filter(f=>f.name.startsWith('clusterings/')).length,4);
+assert(!groupExports.some(f=>f.name==='clustering_tree.csv'));
+assert.match(groupExports.find(f=>f.name==='cluster_representatives.csv').text, /"7","x","C7 · \[One/);
+assert.match(groupExports.find(f=>f.name==='cluster_representatives.csv').text, /"7","y","C7 · \[Two/);
+assert.equal(JSON.parse(groupExports.find(f=>f.name==='settings.json').text).clustering.scope,'separate');
+assert.equal(JSON.stringify({selection,coordinates}),before);
+console.log('PASS: group-specific representatives in joint mode, comparison columns, separate default/migration, explicit joint persistence, per-group tree exports, and preserved selections/embeddings.');
+run('connectedGraph={nodes:[{key:"a"},{key:"b"},{key:"c"}],edges:[]};connectedGraph.edges=[{key:"ab",source:connectedGraph.nodes[0],target:connectedGraph.nodes[1],mean:.6},{key:"bc",source:connectedGraph.nodes[1],target:connectedGraph.nodes[2],mean:-.4}]');
+assert.deepEqual(Array.from(run('estimateCorrelationGraphVisible(connectedGraph,{graphThreshold:.5,graphSign:"both"}).nodes.map(n=>n.key)')),['a','b']);
+assert.deepEqual(Array.from(run('estimateCorrelationGraphVisible(connectedGraph,{graphThreshold:.3,graphSign:"negative"}).nodes.map(n=>n.key)')),['b','c']);
+assert.equal(run('estimateCorrelationGraphVisible(connectedGraph,{graphThreshold:1,graphSign:"both"}).nodes.length'),0);
+assert.equal(run('connectedGraph.nodes.length'),3,'Visibility does not delete clusters');
+console.log('PASS: degree-zero nodes hidden after both magnitude and sign filters; source graph retained.');

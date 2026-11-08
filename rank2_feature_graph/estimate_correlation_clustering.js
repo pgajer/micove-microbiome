@@ -12,7 +12,7 @@ function clusterEstimateCorrelations(bank, settings){
  if(!n)return {labels:[],order:[],linkage:[],method};
  // Average-linkage reciprocal-neighbor chains, with stable feature-order ties.
  let tree=bank.linkage;
- if(method==='dynamic'){
+ if(method==='dynamic'||!Array.isArray(tree)){
   const d=Array.from({length:n},(_,i)=>Float64Array.from({length:n},(_,j)=>at(i,j))),active=new Set(Array.from({length:n},(_,i)=>i));
   const ids=[...active],sizes=new Array(n).fill(1),chain=[];tree=[];
   while(active.size>1){
@@ -22,7 +22,7 @@ function clusterEstimateCorrelations(bank, settings){
    if(b!==previous){chain.push(b);continue}
    chain.length-=2;const keep=Math.min(a,b),drop=Math.max(a,b),sa=sizes[a],sb=sizes[b];
    tree.push([Math.min(ids[a],ids[b]),Math.max(ids[a],ids[b]),best,sa+sb]);
-   for(const j of active)if(j!==a&&j!==b)d[keep][j]=d[j][keep]=(sa*d[a][j]+sb*d[b][j])/(sa+sb);
+   for(const j of active)if(j!==a&&j!==b)d[keep][j]=d[j][keep]=method==='dynamic'?(sa*d[a][j]+sb*d[b][j])/(sa+sb):Math.max(d[a][j],d[b][j]);
    active.delete(drop);ids[keep]=n+tree.length-1;sizes[keep]=sa+sb;
   }
   // Chains discover independent merges out of height order. Relabel after sorting.
@@ -94,4 +94,22 @@ function clusterEstimateCorrelations(bank, settings){
  const sizes=new Map();for(const c of labels)if(c)sizes.set(c,(sizes.get(c)||0)+1);
  const names=new Map([...sizes].sort((a,b)=>b[1]-a[1]||a[0]-b[0]).map(([c],i)=>[c,i+1]));
  return {labels:labels.map(c=>names.get(c)||0),order,linkage:tree,method,criteria:{cut,reference,maxScatter,minGap},implementation:'micove-dynamic-hybrid-v1'};
+}
+
+// Partition correlation fields before building trees, rather than cutting a
+// joint tree and splitting its labels afterwards. Preserve original bank order.
+function clusterEstimateCorrelationGroups(bank,settings){
+ if(settings.clusteringScope==='joint')return {...clusterEstimateCorrelations(bank,settings),scope:'joint'};
+ const n=bank.featureIndices.length,ids=settings.groupIds;
+ if(!Array.isArray(ids)||ids.length!==n||ids.some(g=>typeof g!=='string'||!g))throw Error('Feature group IDs must match the correlation bank.');
+ const members=new Map();ids.forEach((g,i)=>{if(!members.has(g))members.set(g,[]);members.get(g).push(i)});
+ const labels=new Array(n).fill(0),order=[],groups=[];let offset=0;
+ for(const [categoryId,indices] of members){
+  const correlations=[];for(let a=0;a<indices.length;a++)for(let b=a+1;b<indices.length;b++){let i=indices[a],j=indices[b];if(i>j)[i,j]=[j,i];correlations.push(bank.correlations[i*n-i*(i+1)/2+j-i-1])}
+  // Neither the joint hierarchy nor between-group correlations enter this fit.
+  const part=clusterEstimateCorrelations({featureIndices:indices.map(i=>bank.featureIndices[i]),correlations},settings);
+  part.labels.forEach((c,i)=>{labels[indices[i]]=c?offset+c:0});order.push(...part.order.map(i=>indices[i]));
+  groups.push({categoryId,indices,...part,labels:part.labels.map(c=>c?offset+c:0)});offset+=Math.max(0,...part.labels);
+ }
+ return {labels,order,linkage:[],groups,scope:'separate',method:settings.clustering,implementation:'micove-groupwise-correlation-clustering-v1'};
 }

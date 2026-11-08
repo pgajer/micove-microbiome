@@ -122,6 +122,15 @@ only three recent subset results are cached. At least three eligible participant
 are required. Constant fields are excluded separately for every subset. The saved
 full-reference banks and all original estimate arrays remain unchanged.
 
+**Cluster groups → Separately** is the default scope. Each feature group gets
+its own hierarchy, built only from its within-group correlations, and is cut
+independently. Between-group correlations cannot change those memberships.
+**Jointly** retains the combined hierarchy across all nonconstant fields,
+including assay-availability diagnostics. In separate mode, diagnostics have
+their own hierarchy. Group/search display filters never change either fit.
+Older saved preferences with no explicit scope adopt Separate and clear stale
+cluster selections; later explicit choices persist. Other settings are retained.
+
 **Dynamic Tree Cut** is the default feature clustering, with **Minimum cluster
 size = 5** and **Splitting sensitivity = 1** (range 0–4). An independent browser
 implementation follows the published Dynamic Hybrid procedure on average linkage
@@ -134,9 +143,11 @@ reference validator below, including LSVF banks and synthetic examples.
 
 The **Minimum correlation** alternative retains complete linkage cut at `1 - t`,
 so every within-cluster pair has correlation at least `t`. Negative correlations
-remain visible but are not treated as similarity. Both methods cluster all
-nonconstant fields jointly, including diagnostic fields. Group, search and
-cluster filters affect display only. Cluster identifiers are specific to the
+remain visible but are not treated as similarity. Both methods support separate
+and joint scope. Separate mode rebuilds complete linkage from each group matrix,
+without reusing the joint tree. Group, search and cluster filters affect display
+only. A selected focus cluster keeps all comparison-group columns in Separate
+mode; Joint mode keeps the matching joint cluster on both axes. Cluster identifiers are specific to the
 sample scope, correlation method, visit mode, K and clustering settings. Near-tied
 hierarchical merges can differ between R and the browser. Shared-tree validation
 checks the cut independently of these numerical ordering choices.
@@ -147,10 +158,14 @@ trivial diagonal; the remaining panels compare that group with each other group.
 The focus rows share one order. Cluster boundary lines appear on both axes;
 within-group lines stop at the diagonal. Labels use **C3 · [feature name]**,
 with the same numeric ID as the Cluster dropdown. The representative maximizes
-mean signed correlation to the other members of the full joint cluster
+mean signed correlation to the other cluster members in the same feature group
 (equivalently, minimizes mean distance `1 - r`). Numerical ties within `1e-12`
 use frozen feature order. Singletons represent themselves; Unassigned fields
-have no representative. The representative may come from another feature group.
+have no representative. Representatives always belong to the corresponding
+feature group. In Joint mode the same cluster ID can have different names in
+two groups. Keys show the group name when a panel spans groups. The All groups
+view uses a whole-cluster representative for a node spanning several groups;
+individual field labels remain group-specific.
 It is a descriptive label, not evidence of biological importance. Display filters
 never change representatives; changes to samples or calculation settings can.
 Compact axis codes and hover strips share a full-label key above each heatmap. Assay-availability comparisons appear in a
@@ -167,14 +182,16 @@ The catalogue panel is the single vertical scroll area; the gallery has no
 nested height limit, so the last heatmap and its graph remain reachable in
 normal and maximized views. The participant-averaging checkbox, shared K and
 Follow graph selection remain available. Saved clustering preferences persist;
-older settings without a clustering method adopt the new defaults.
+older settings without a clustering method or scope adopt the new defaults.
 
 Each heatmap has an expandable **Feature cluster graph** beneath it. Within-group
-graphs use one node per represented joint cluster; between-group graphs use
+graphs use one node per represented cluster; between-group graphs use
 separate row-group and column-group nodes, including connections between subsets
-of the same joint cluster. Node area counts displayed features in that group,
+of the same joint cluster when Jointly is selected. Node area counts displayed features in that group,
 not participants or the entire joint cluster. Unassigned fields have no graph
-node, and isolated nodes remain visible. Positions stay fixed when edge filters
+node. Nodes of degree zero after the edge threshold/sign filters are hidden;
+their features remain in the heatmap. A one-feature cluster remains visible if
+it has a displayed connection. Positions stay fixed when edge filters
 change. Dense within-group graphs use compact C codes with full labels on hover.
 
 An edge is the arithmetic mean **signed** correlation over all cross-node feature
@@ -194,15 +211,23 @@ outline. The separate Cluster dropdown and search still filter both heatmap and
 graph display subsets. Graph threshold and sign choices persist across reopening.
 Joint clustering uses all nonconstant feature groups, including assay-availability
 diagnostics: minimum size 5 can therefore mean one immune marker plus four
-metabolites, rather than five immune markers. Each panel uses the same assignments.
+metabolites, rather than five immune markers. Separate mode counts only that
+group’s members toward the minimum; a group smaller than the requested minimum
+may remain entirely unassigned. Those features stay in the heatmap, without graph
+nodes. IDs are unique across groups in the current configuration and do not imply
+biological correspondence. Each panel reuses the relevant group assignments.
 
 **Download results ZIP** includes one CSV per heatmap in `matrices/` (full
 symmetric matrices, including their diagonals), a combined `correlations.csv`,
 feature assignments and transformations, `cluster_representatives.csv` with
-representative IDs and mean correlations, the full hierarchy and leaf-ID map,
+group-specific representative IDs, group and full-cluster sizes and mean
+correlations. Joint mode exports the full hierarchy and leaf-ID map; Separate
+mode exports a tree and leaf-ID map per group under `clusterings/`, with local
+node numbers. Both include
 exact settings, panel identities, source checksums, a README and methods HTML.
 `graphs/` adds node feature membership and all candidate edge summaries per panel,
-with a `displayed` flag identifying threshold/sign filtering.
+with a `displayed` flag identifying threshold/sign filtering. Node tables retain
+hidden nodes and record their displayed degree and visibility.
 Subset exports also include `selected_samples.csv`. The methods page provides
 formulas and Print / save as PDF. Correlations describe smoothed estimate fields,
 not raw measurements or significance tests. Shared neighborhoods, compositional
