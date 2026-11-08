@@ -359,6 +359,7 @@ function estimateCorrelationInstall(){
  <label title="Average each participant’s visits first, then compare participants equally. Unchecked: keep all visits with equal total weight per participant."><input type="checkbox" id="correlationAverage"> Average visits per participant</label>
  <input type="search" id="correlationSearch" aria-label="Find row features" placeholder="Find row features…">
  </div></details><div class="correlationActions"><div class="correlationClusterControl"><label for="correlationCluster">Cluster</label><div class="participantPicker correlationClusterPicker"><button id="previousCorrelationCluster" type="button" aria-label="Previous feature cluster" title="Previous item in the cluster list" disabled>‹</button><select id="correlationCluster" aria-label="Feature cluster" disabled></select><button id="nextCorrelationCluster" type="button" aria-label="Next feature cluster" title="Next item in the cluster list" disabled>›</button></div></div><button type="button" id="correlationMethods">Methods…</button> <button type="button" id="correlationExport" disabled>Download results ZIP</button> <a id="correlationDownload" hidden>Download prepared ZIP</a></div>
+ <section id="jointProfileSummary" hidden aria-label="Current color profile"><h3>Current color profile</h3><p id="jointProfileSavedLabel"></p><details><summary>Saved clustering settings</summary><p id="jointProfileSavedDescription"></p></details><p id="jointProfileHeatmapRelation"></p><button type="button" id="jointProfileMethods">Profile definition…</button><button type="button" id="jointProfileExport" disabled>Download profile + definition</button><p id="jointProfileExportStatus" role="status"></p></section>
  <div class="correlationControls correlationGraphSettings"><b>Cluster graphs</b><label>Layout <select id="correlationGraphLayout"><option value="structured">Circular / bipartite</option><option value="mds">2D metric MDS</option><option value="weighted_grip">2D weighted GRIP</option></select></label><label title="Display edges whose signed mean correlation has at least this magnitude. This is not a significance threshold.">|Mean correlation| ≥ <input id="correlationGraphThreshold" type="number" min="0" max="1" step="0.01" value="0.3"></label><label>Sign <select id="correlationGraphSign"><option value="both">Both signs</option><option value="positive">Positive</option><option value="negative">Negative</option></select></label></div>
  <p id="estimateCorrelationStatus" role="status" aria-live="polite"></p><p id="estimateCorrelationPair">Click a heatmap cell to inspect its two fields.</p>
  <div id="estimateCorrelationGallery"></div>
@@ -384,6 +385,7 @@ function estimateCorrelationInstall(){
   if(estimateCorrelationShown){estimateCorrelationShown.state[key]=s[key];for(const graph of document.querySelectorAll('#estimateCorrelationGallery .correlationGraph'))graph._estimateCorrelationRedraw?.();el('correlationDownload').hidden=true}
  };
  el('correlationGraphThreshold').oninput=()=>el('correlationGraphThreshold').onchange();
+ el('jointProfileMethods').onclick=jointProfileMethods;el('jointProfileExport').onclick=()=>jointProfileExport().catch(e=>{el('jointProfileExportStatus').textContent='Profile download unavailable: '+e.message});
  el('correlationMethods').onclick=estimateCorrelationMethods;el('correlationExport').onclick=()=>exportEstimateCorrelations().catch(estimateCorrelationError);
  el('estimateCorrelationAssignments').onclick=e=>{const b=e.target.closest?.('[data-correlation-feature]');if(b)estimateCorrelationSelect(Number(b.dataset.correlationFeature)).catch(estimateCorrelationError)};
 }
@@ -405,7 +407,7 @@ async function drawEstimateCorrelations(){
  const request=++estimateCorrelationRequest,scope=estimateCorrelationScope();estimateCorrelationCancel();
  el('catalogueTitle').textContent=(asset.categories.find(g=>g.id===s.rows)?.label||'All groups')+' · Estimate correlations';
  if(s.clusterScope!==scope.key){s.cluster='all';s.clusterScope=scope.key;estimateCorrelationSave()}
- estimateCorrelationRequestedScope=scope.key;estimateCorrelationShown=null;
+ estimateCorrelationRequestedScope=scope.key;estimateCorrelationShown=null;if(typeof jointProfileHeatmapSync==='function')jointProfileHeatmapSync();
  for(const id of ['Rows','Cols']){const node=el('correlation'+id);node.replaceChildren(...[{id:'all',label:'All groups'},...asset.categories].map(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.label+(g.id==='assay-availability'?' (diagnostics)':'');return o}));node.value=s[id.toLowerCase()]}
  el('correlationFollow').checked=s.follow;el('correlationK').value=s.k;el('correlationMethod').value=s.method;el('correlationAverage').checked=s.unit==='participants';el('correlationThreshold').value=s.threshold;el('correlationSearch').value=s.search;
  for(const [id,key] of [['Clustering','clustering'],['ClusteringScope','clusteringScope'],['MinSize','minSize'],['DeepSplit','deepSplit'],['GraphThreshold','graphThreshold'],['GraphSign','graphSign'],['GraphLayout','graphLayout']])el('correlation'+id).value=s[key];
@@ -448,7 +450,7 @@ async function drawEstimateCorrelations(){
  const rows=order.filter(i=>matches(i)&&(s.rows==='all'||field(i).categoryId===s.rows)&&(!query||(field(i).label+' '+field(i).transformationLabel).toLowerCase().includes(query)));
  const panels=estimateCorrelationPanels(asset,bank,s,order,labels,rows);
  const cols=[...new Set(panels.flatMap(p=>p.cols))],shown={asset,data,bank,descriptor,labels,representatives,groupRepresentatives,rows,cols,panels,clustering,scope,state:{...s}};estimateCorrelationShown=shown;
- if(typeof jointProfileCatalogue==='function')jointProfileCatalogue(shown);
+ if(typeof jointProfileCatalogue==='function')jointProfileCatalogue(shown);if(typeof jointProfileHeatmapSync==='function')jointProfileHeatmapSync();
  const gallery=el('estimateCorrelationGallery');
  for(const [index,p] of panels.entries()){
   if(request!==estimateCorrelationRequest)return;

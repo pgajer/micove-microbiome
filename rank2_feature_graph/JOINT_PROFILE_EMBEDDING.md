@@ -19,6 +19,11 @@ The search shows the feature group, cluster membership and grouped member list.
 Choose **This feature** to color by its saved estimate, or **Cluster profile**
 for the aggregate. When a joint heatmap is open, its current cluster definition
 is separately available; it may differ from the embedding's frozen definition.
+The sample sidebar labels the saved color definition. The heatmap panel's
+**Current color profile** section compares it with the current heatmap and
+provides the profile formulas and download. **Color 3D samples** beside a
+heatmap cluster explicitly adopts that definition for coloring; the saved 3D
+map remains unchanged.
 
 ## Frozen input and profile definition
 

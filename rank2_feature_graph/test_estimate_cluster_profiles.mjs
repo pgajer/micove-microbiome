@@ -70,3 +70,34 @@ run('jointProfileModel().weighting="features"');await run('recolorSampleView()')
 run('delete estimateModel().jointProfiles');assert.equal(run('jointProfileModel().weighting'),'groups');assert.equal(run('jointProfileModel().chosen'),1);
 const savedKey=run('jointProfileKey(asset)'),legacy=JSON.parse(saved.get(savedKey));delete legacy.weighting;saved.set(savedKey,JSON.stringify(legacy));run('delete estimateModel().jointProfiles');assert.equal(run('jointProfileModel().weighting'),'features');
 console.log('PASS: unequal group sizes, tied/half-weight medians, within-group duplication, one-group equivalence, mode-specific caching, restored original colors, saved weighting/default migration and exported feature weights.');
+
+// Saved definitions are distinct from the current heatmap and the fixed map.
+view.labels=[1,0,1];view.state.k=40;view.state.clusteringScope='joint';view.scope.label='Full reference';
+const snapshot=plain(run('jointProfileSnapshot(view)'));context.snapshot=snapshot;
+assert.equal(snapshot.source.kind,'heatmap');
+assert.equal(run('jointProfileDefinitionLabel(snapshot)'),'Saved heatmap clustering');
+assert.match(run('jointProfileHeatmapRelation(snapshot,view)'),/matches the current heatmap/);
+const relabeled=structuredClone(snapshot);relabeled.clusters[0].label='C1';context.relabeled=relabeled;
+assert.equal(run('jointProfileComparableDefinition(snapshot)'),run('jointProfileComparableDefinition(relabeled)'));
+view.labels=[1,1,0];
+assert.match(run('jointProfileHeatmapRelation(snapshot,view)'),/differs.*same cluster number/);
+view.state.clusteringScope='separate';
+assert.match(run('jointProfileHeatmapRelation(snapshot,view)'),/separately.*unchanged/);
+assert.match(run('jointProfileHeatmapRelation(snapshot,null)'),/being prepared/);
+assert.equal(run('jointProfileDefinitionLabel({...snapshot,source:{kind:"embedding",id:"frozen"}})'),'Frozen 39-cluster map');
+assert.equal(run('jointProfileDefinitionLabel({...snapshot,source:undefined})'),'Saved joint clustering (earlier session)');
+view.state.clusteringScope='joint';view.labels=[1,1,0];
+const beforeAction=JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.meta]),camera:plot.layout.scene});
+await run('jointProfileChoose(1,view)');
+assert.deepEqual(plain(run('jointProfileDefinition().members')),[0,1]);
+assert.equal(run('jointProfileModel().snapshot.source.kind'),'heatmap');
+assert.equal(run('jointProfileExportReady()'),true);
+await run('jointProfileExport()');
+assert.equal(JSON.parse(exported[1].text).definitionSourceLabel,'Saved heatmap clustering');
+view.labels=[1,0,1];
+assert.deepEqual(plain(run('jointProfileDefinition().members')),[0,1],'Later heatmap changes cannot replace the saved color definition');
+assert.equal(beforeAction,JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.meta]),camera:plot.layout.scene}));
+run('jointProfileModel().weighting="groups"');
+assert.equal(run('jointProfileExportReady()'),false,'Do not export a previous color row with a newly selected definition');
+await assert.rejects(run('jointProfileExport()'),/finish loading/);
+console.log('PASS: saved-definition provenance, exact heatmap comparison, explicit cluster adoption, export identity and unchanged selections/embeddings.');

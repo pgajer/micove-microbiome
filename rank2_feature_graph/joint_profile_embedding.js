@@ -102,7 +102,7 @@ async function jointFeatureSearch(){
  el('findFeatureQuery').oninput=draw;el('findFeatureDefinition').onchange=draw;el('closeFindFeature').onclick=()=>dialog.close();
  el('findFeatureResults').onclick=async event=>{const f=event.target.closest('[data-find-feature]'),c=event.target.closest('[data-find-cluster]'),source=el('findFeatureDefinition').value,snapshot=snapshots[source];if(!f&&!c)return;
   try{if(f){const field=asset.correlations.fields[Number(f.dataset.findFeature)],m=estimateModel(),id=field.seriesIds[String(snapshot.settings.k)];if(!m.bySeries.has(id))throw Error('Feature estimate not installed.');syncSampleColorOptions();el('sampleColorScheme').value='estimate:'+field.categoryId;m.choices[field.categoryId]=id;estimateSave();await recolorSampleView()}
-   else{const m=jointProfileModel();m.snapshot=snapshot;m.rows.clear();if(source==='embedding')m.weighting=embedding.weighting;await jointProfileChoose(Number(c.dataset.findCluster))}dialog.close();
+   else{const m=jointProfileModel();m.snapshot=source==='embedding'?{...snapshot,source:{kind:'embedding',id:embedding.id}}:snapshot;m.rows.clear();if(source==='embedding')m.weighting=embedding.weighting;await jointProfileChoose(Number(c.dataset.findCluster))}dialog.close();
   }catch(error){el('findFeatureScope').textContent=error.message}
  };draw();dialog.showModal();el('findFeatureQuery').focus();
 }

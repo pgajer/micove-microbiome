@@ -496,12 +496,21 @@ Cluster membership may come from a graph selection or participant-mean
 correlations. Colors still summarize each visit's own saved estimates using the
 full common-support percentile reference. Visits without common support are gray.
 The chosen membership, K and scale are pinned and saved locally. Exploring graph
-selections or changing heatmap settings does not redefine them. Choose a catalogue
-cluster or press **Use current heatmap clusters** to replace the definition.
+selections or changing heatmap settings does not redefine them. Use **Color 3D samples** beside a cluster in the heatmap catalogue to replace
+the definition. This action is available while the member list is collapsed.
 The displayed description records the clustering scope and settings. Color clipping
 at the 2.5th/97.5th percentiles changes only display; profile values remain intact.
 
-**Profile definition…** explains the formulas. **Download profile + definition**
+The heatmap panel’s **Current color profile** section identifies the saved
+definition as the frozen 39-cluster map, a saved heatmap clustering, or an earlier
+saved definition whose source was not recorded. It states whether membership
+and settings match the current joint heatmap; the same cluster number can refer
+to different members. Saved clustering settings are expandable. The sample
+sidebar retains cluster navigation, weighting and clipping, with the same source
+label. Heatmap changes never silently replace the saved color definition.
+
+In **Current color profile**, **Profile definition…** explains the formulas,
+and **Download profile + definition**
 produces one ZIP containing `profile.csv` (sample IDs, unmodified scores, support
 status) and `definition.json` (membership, transformations, K, clustering settings,
 reference counts, source revisions, sample-order identity and color limits).
