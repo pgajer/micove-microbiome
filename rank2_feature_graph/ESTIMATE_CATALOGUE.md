@@ -162,15 +162,47 @@ sample colors restores the catalogue.
 
 A heatmap cell or feature-table link colors the existing 3D samples without
 changing selection or coordinates. Cluster and its previous/next buttons stay
-outside **Heatmap settings**. The participant-averaging checkbox, shared K and
+outside **Heatmap settings**, along with the clustering method and its parameters.
+The catalogue panel is the single vertical scroll area; the gallery has no
+nested height limit, so the last heatmap and its graph remain reachable in
+normal and maximized views. The participant-averaging checkbox, shared K and
 Follow graph selection remain available. Saved clustering preferences persist;
 older settings without a clustering method adopt the new defaults.
+
+Each heatmap has an expandable **Feature cluster graph** beneath it. Within-group
+graphs use one node per represented joint cluster; between-group graphs use
+separate row-group and column-group nodes, including connections between subsets
+of the same joint cluster. Node area counts displayed features in that group,
+not participants or the entire joint cluster. Unassigned fields have no graph
+node, and isolated nodes remain visible. Positions stay fixed when edge filters
+change. Dense within-group graphs use compact C codes with full labels on hover.
+
+An edge is the arithmetic mean **signed** correlation over all cross-node feature
+pairs (excluding a feature paired with itself). The shared magnitude threshold
+defaults to 0.30; sign choices are Both, Positive and Negative. Positive edges
+are red, negative blue, zero gray; width increases with absolute mean. There
+are no within-group self-loops. Positive and negative pairs can cancel, so edge
+details also give pair count, range and positive/negative fractions. Node details
+give the mean over distinct within-node pairs; singletons have no such mean.
+These are descriptive summaries, not significance tests.
+
+Click a graph node to outline its heatmap rows/columns, or an edge to outline its
+block; the feature list and a **Show highlighted heatmap** button accompany the
+selection. These clicks keep the full current display context and never change
+sample selection, estimates or embeddings. **Clear graph highlight** removes the
+outline. The separate Cluster dropdown and search still filter both heatmap and
+graph display subsets. Graph threshold and sign choices persist across reopening.
+Joint clustering uses all nonconstant feature groups, including assay-availability
+diagnostics: minimum size 5 can therefore mean one immune marker plus four
+metabolites, rather than five immune markers. Each panel uses the same assignments.
 
 **Download results ZIP** includes one CSV per heatmap in `matrices/` (full
 symmetric matrices, including their diagonals), a combined `correlations.csv`,
 feature assignments and transformations, `cluster_representatives.csv` with
 representative IDs and mean correlations, the full hierarchy and leaf-ID map,
 exact settings, panel identities, source checksums, a README and methods HTML.
+`graphs/` adds node feature membership and all candidate edge summaries per panel,
+with a `displayed` flag identifying threshold/sign filtering.
 Subset exports also include `selected_samples.csv`. The methods page provides
 formulas and Print / save as PDF. Correlations describe smoothed estimate fields,
 not raw measurements or significance tests. Shared neighborhoods, compositional
