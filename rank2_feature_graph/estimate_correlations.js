@@ -18,6 +18,16 @@ function estimateCorrelationState(){
  estimateCorrelationViews.set(asset,state);return state;
 }
 function estimateCorrelationSave(){const s=estimateCorrelationState();if(s)try{localStorage.setItem(s.key,JSON.stringify(s))}catch{}}
+function estimateCorrelationClusterNavigation(){
+ const select=el('correlationCluster');
+ el('previousCorrelationCluster').disabled=select.disabled||select.selectedIndex<=0;
+ el('nextCorrelationCluster').disabled=select.disabled||select.selectedIndex<0||select.selectedIndex>=select.options.length-1;
+}
+function estimateCorrelationStepCluster(direction){
+ const select=el('correlationCluster'),index=select.selectedIndex+direction;
+ if(select.disabled||select.selectedIndex<0||index<0||index>=select.options.length)return;
+ select.value=select.options[index].value;select.onchange();
+}
 function estimateCorrelationValue(bank,i,j){if(i===j)return 1;if(i>j)[i,j]=[j,i];const n=bank.featureIndices.length;return bank.correlations[i*n-i*(i+1)/2+j-i-1]}
 function estimateCorrelationClusters(bank,threshold){
  const n=bank.featureIndices.length,parent=Array.from({length:n},(_,i)=>i),representatives=[...parent];
@@ -53,7 +63,7 @@ function estimateCorrelationCompute(input,scope,s){
 }
 function estimateCorrelationInstall(){
  if(el('estimateCorrelationPanel'))return;
- const style=document.createElement('style');style.textContent=`#estimateCorrelationPanel[hidden],#closeEstimateCorrelation[hidden]{display:none!important}#cataloguePanel.correlationDocked>:not(.panelHeader):not(#estimateCorrelationPanel){display:none!important}#cataloguePanel.correlationDocked>.panelHeader>:not(#catalogueTitle):not(#maximize-cataloguePanel):not(#closeEstimateCorrelation){display:none!important}#estimateCorrelationPanel{padding:10px;min-height:400px}#estimateCorrelationControls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:12px}#estimateCorrelationControls label{display:flex;align-items:center;gap:5px}#estimateCorrelationControls select,#estimateCorrelationControls input[type=search],#estimateCorrelationControls input[type=number],#estimateCorrelationControls button{font:inherit;min-height:29px;box-sizing:border-box}#estimateCorrelationControls input[type=number]{width:65px}#estimateCorrelationControls input[type=search]{width:180px}#estimateCorrelationPlot{width:100%;height:480px}#cataloguePanel.maximized #estimateCorrelationPlot{height:65vh;min-height:480px}#estimateCorrelationPanel p{font-size:12px;line-height:1.5}#estimateCorrelationPanel details{margin-top:8px}#estimateCorrelationAssignments{max-height:260px;overflow:auto}#estimateCorrelationAssignments table{font-size:12px;width:100%;border-collapse:collapse}#estimateCorrelationAssignments td,#estimateCorrelationAssignments th{padding:5px;border-bottom:1px solid #dae2e5;text-align:left}#estimateCorrelationAssignments button{font:inherit;text-align:left;border:0;background:transparent;color:#12657a;cursor:pointer}#estimateCorrelationMethods{width:min(860px,90vw);max-height:85vh;overflow:auto;font-size:15px;line-height:1.55}#estimateCorrelationMethods math{display:block math;margin:18px;font-size:1.15em}#estimateCorrelationPair{min-height:22px}`;
+ const style=document.createElement('style');style.textContent=`#estimateCorrelationPanel[hidden],#closeEstimateCorrelation[hidden]{display:none!important}#cataloguePanel.correlationDocked>:not(.panelHeader):not(#estimateCorrelationPanel){display:none!important}#cataloguePanel.correlationDocked>.panelHeader>:not(#catalogueTitle):not(#maximize-cataloguePanel):not(#closeEstimateCorrelation){display:none!important}#estimateCorrelationPanel{padding:10px;min-height:400px}#estimateCorrelationControls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:12px}#estimateCorrelationControls label{display:flex;align-items:center;gap:5px}#estimateCorrelationControls select,#estimateCorrelationControls input[type=search],#estimateCorrelationControls input[type=number],#estimateCorrelationControls button{font:inherit;min-height:29px;box-sizing:border-box}#estimateCorrelationControls .correlationClusterControl{display:flex;align-items:center;gap:5px;max-width:100%}#estimateCorrelationControls .correlationClusterPicker{align-items:stretch;min-width:0}#estimateCorrelationControls .correlationClusterPicker select{min-width:0;width:100%}#estimateCorrelationControls .correlationClusterPicker button{margin:0;padding:3px;font-size:20px;line-height:1.3}#estimateCorrelationControls input[type=number]{width:65px}#estimateCorrelationControls input[type=search]{width:180px}#estimateCorrelationPlot{width:100%;height:480px}#cataloguePanel.maximized #estimateCorrelationPlot{height:65vh;min-height:480px}#estimateCorrelationPanel p{font-size:12px;line-height:1.5}#estimateCorrelationPanel details{margin-top:8px}#estimateCorrelationAssignments{max-height:260px;overflow:auto}#estimateCorrelationAssignments table{font-size:12px;width:100%;border-collapse:collapse}#estimateCorrelationAssignments td,#estimateCorrelationAssignments th{padding:5px;border-bottom:1px solid #dae2e5;text-align:left}#estimateCorrelationAssignments button{font:inherit;text-align:left;border:0;background:transparent;color:#12657a;cursor:pointer}#estimateCorrelationMethods{width:min(860px,90vw);max-height:85vh;overflow:auto;font-size:15px;line-height:1.55}#estimateCorrelationMethods math{display:block math;margin:18px;font-size:1.15em}#estimateCorrelationPair{min-height:22px}`;
  document.head.appendChild(style);
  const panel=document.createElement('section');panel.id='estimateCorrelationPanel';panel.hidden=true;panel.setAttribute('aria-label','Estimate correlations');
  panel.innerHTML=`<details id="correlationSettings"><summary>Heatmap settings</summary><div id="estimateCorrelationControls">
@@ -64,7 +74,7 @@ function estimateCorrelationInstall(){
  <label>Correlation <select id="correlationMethod"><option value="spearman">Spearman</option><option value="pearson">Pearson</option></select></label>
  <label title="Average each participant’s visits first, then compare participants equally. Unchecked: keep all visits with equal total weight per participant."><input type="checkbox" id="correlationAverage"> Average visits per participant</label>
  <label title="Complete-linkage clusters: every pair has correlation at least this value. Filters below keep these joint clusters unchanged.">Minimum correlation <input type="number" id="correlationThreshold" min="0" max="1" step="0.05" value="0.7"></label>
- <label>Cluster <select id="correlationCluster" aria-label="Feature cluster"></select></label>
+ <div class="correlationClusterControl"><label for="correlationCluster">Cluster</label><div class="participantPicker correlationClusterPicker"><button id="previousCorrelationCluster" type="button" aria-label="Previous feature cluster" title="Previous item in the cluster list" disabled>‹</button><select id="correlationCluster" aria-label="Feature cluster" disabled></select><button id="nextCorrelationCluster" type="button" aria-label="Next feature cluster" title="Next item in the cluster list" disabled>›</button></div></div>
  <input type="search" id="correlationSearch" aria-label="Find row features" placeholder="Find row features…">
  </div></details><div class="correlationActions"><button type="button" id="correlationMethods">Methods…</button> <button type="button" id="correlationExport" disabled>Download results ZIP</button> <a id="correlationDownload" hidden>Download prepared ZIP</a></div>
  <p id="estimateCorrelationStatus" role="status" aria-live="polite"></p>
@@ -80,6 +90,8 @@ function estimateCorrelationInstall(){
   if(key==='threshold')s.threshold=Math.max(0,Math.min(1,Number.isFinite(s.threshold)?s.threshold:.7));
   if(['k','method','threshold'].includes(key))s.cluster='all';estimateCorrelationSave();drawEstimateCorrelations().catch(estimateCorrelationError);
  };
+ el('previousCorrelationCluster').onclick=()=>estimateCorrelationStepCluster(-1);
+ el('nextCorrelationCluster').onclick=()=>estimateCorrelationStepCluster(1);
  el('correlationFollow').onchange=()=>{const s=estimateCorrelationState();s.follow=el('correlationFollow').checked;s.cluster='all';estimateCorrelationSave();drawEstimateCorrelations().catch(estimateCorrelationError)};
  el('correlationThreshold').oninput=()=>{const node=el('correlationThreshold');if(node.value!==''&&node.validity.valid)node.onchange()};
  el('correlationAverage').onchange=()=>{const s=estimateCorrelationState();s.unit=el('correlationAverage').checked?'participants':'visits';s.cluster='all';estimateCorrelationSave();drawEstimateCorrelations().catch(estimateCorrelationError)};
@@ -108,6 +120,7 @@ async function drawEstimateCorrelations(){
  estimateCorrelationRequestedScope=scope.key;estimateCorrelationShown=null;
  for(const id of ['Rows','Cols']){const node=el('correlation'+id);node.replaceChildren(...[{id:'all',label:'All groups'},...asset.categories].map(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.label+(g.id==='assay-availability'?' (diagnostics)':'');return o}));node.value=s[id.toLowerCase()]}
  el('correlationFollow').checked=s.follow;el('correlationK').value=s.k;el('correlationMethod').value=s.method;el('correlationAverage').checked=s.unit==='participants';el('correlationThreshold').value=s.threshold;el('correlationSearch').value=s.search;
+ el('correlationCluster').disabled=true;estimateCorrelationClusterNavigation();
  el('correlationExport').disabled=true;el('correlationDownload').hidden=true;
  el('estimateCorrelationPair').textContent='Click a heatmap cell to inspect its two fields.';
  el('estimateCorrelationAssignments').replaceChildren();el('estimateCorrelationExcluded').replaceChildren();
@@ -167,6 +180,7 @@ async function drawEstimateCorrelations(){
  el('estimateCorrelationAssignments').innerHTML='<table><thead><tr><th>Cluster</th><th>Feature</th><th>Group</th><th>Transformation</th></tr></thead><tbody>'+visible.map(i=>{const f=field(i);return `<tr><td>${labels[i]}</td><td><button type="button" data-correlation-feature="${bank.featureIndices[i]}">${esc(f.label)}</button></td><td>${esc(asset.categories.find(g=>g.id===f.categoryId)?.label||f.categoryId)}</td><td>${esc(f.transformationLabel)}</td></tr>`}).join('')+'</tbody></table>';
  el('estimateCorrelationExcludedTitle').textContent='Excluded constant fields · '+bank.excluded.length;
  el('estimateCorrelationExcluded').textContent=bank.excluded.map(e=>data.fields[e.featureIndex].label+' ('+data.fields[e.featureIndex].transformationLabel+')').join('; ');
+ el('correlationCluster').disabled=false;estimateCorrelationClusterNavigation();
  el('correlationExport').disabled=false;
 }
 async function estimateCorrelationSelect(index){
