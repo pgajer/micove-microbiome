@@ -158,3 +158,9 @@
 !/rank2_feature_graph/test_estimate_correlations.mjs
 
 !/rank2_feature_graph/estimate_correlation_compute.js
+
+!/rank2_feature_graph/estimate_correlation_clustering.js
+
+!/rank2_feature_graph/test_estimate_clustering.mjs
+
+!/rank2_feature_graph/verify_dynamic_tree_cut.R

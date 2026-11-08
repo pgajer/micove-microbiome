@@ -108,6 +108,7 @@ async function recolorSampleView(){
  }
  if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();
  syncValenciaControls();renderCountedSampleLegend();
+ if(typeof syncEstimateCorrelationPanel==='function')table();
  if(typeof sampleRenderedKey!=='undefined')sampleRenderedKey=sampleViewKey();
  if(typeof saveDatasetPanelSettings==='function')saveDatasetPanelSettings();
 }

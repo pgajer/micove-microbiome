@@ -21,6 +21,7 @@ def assemble_viewer(here, *, pack, plotly, palette, legend_abundance, overlap_av
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'valencia2.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_colors.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_correlation_compute.js').read_text()
+    replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_correlation_clustering.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_correlations.js').read_text()
     replacements['EMBEDDING_FAMILIES']=(here/'embedding_families.js').read_text()+'\n'+(here/'principal_paths.js').read_text()
     page = re.sub(r'/\*(TAXON_PALETTE|QUALITY_POLICY|PLOTLY|BUNDLES|BUNDLE_VALIDATOR|DATASET_PREFERENCES|DATASET_CONTROLLER|COHORT_CONTROLLER|PANEL_LAYOUT|SAMPLE_INSPECTOR|VIEW_TOOLS|NAMED_VIEWS|RANK3|PARTICIPANTS|SUBJECT_EMBEDDING|GRAPH_LAYOUT|TRAJECTORY_QUALITY|TRAJECTORY|ANNOTATIONS|EMBEDDING_FAMILIES)\*/', lambda match: replacements[match.group(1)], (here/'viewer.html').read_text())

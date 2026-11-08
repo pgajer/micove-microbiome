@@ -119,32 +119,67 @@ feature-major array per K, alongside checked feature order, eligible record
 indices and participant-group IDs. They preserve exact saved estimate values.
 A cancellable background worker computes subset correlations and complete linkage;
 only three recent subset results are cached. At least three eligible participants
-are required. Exclude constant fields separately for each subset. Tied distances
-can make clusters sensitive to floating-point rounding; use deterministic nearest-
-neighbor chains with previous-member then frozen-feature-order tie preference. Complete linkage of `1 - correlation`, cut at `1 - t`,
-gives clusters with every within-cluster correlation at least `t`. Negative
-correlations remain visible without joining positive clusters. Clustering uses
-all nonconstant fields jointly; group, search and cluster filters affect display
-only. Cluster identifiers are specific to the selected settings.
+are required. Constant fields are excluded separately for every subset. The saved
+full-reference banks and all original estimate arrays remain unchanged.
 
-Open **Correlation heatmap…** under **Exploratory estimates**. It occupies the
-catalogue panel and shares its maximize control. Choose groups for the two axes,
-or the same group for a within-group view. A heatmap cell offers links to color
-the existing 3D samples by either field, without changing selection or coordinates.
-The feature table also provides those links. Cluster and its previous/next buttons
-stay visible outside the collapsible Heatmap settings. The buttons follow its displayed list, starting with All clusters and stopping at either end.
-They are unavailable while correlations load or cannot be calculated.
-Settings are remembered per dataset
-and correlation revision.
+**Dynamic Tree Cut** is the default feature clustering, with **Minimum cluster
+size = 5** and **Splitting sensitivity = 1** (range 0–4). An independent browser
+implementation follows the published Dynamic Hybrid procedure on average linkage
+of signed distance `1 - correlation`: branch size, core scatter and separation,
+then average-distance assignment respecting the dendrogram and small branches.
+Unassigned fields retain label zero and are displayed as Unassigned. This is not
+resampling stability and does not guarantee a minimum within-cluster correlation.
+The implementation is checked against R dynamicTreeCut 1.63-1 using the optional
+reference validator below, including LSVF banks and synthetic examples.
 
-**Download results ZIP** includes the displayed correlation matrix, assignments
-for every feature (including exclusions and a visibility flag), exact settings
-and source checksums, a README, and an HTML methods page with formulas. The methods
-Selected-subset exports also include `selected_samples.csv` with sample IDs and
-common-support inclusion flags. The methods page is also available in the panel and can be printed/saved as PDF. Correlations
-describe smoothed fields, not underlying-feature association tests or calibrated
-risk. Shared neighborhoods, compositional constraints, assay substitutions and
-larger K can create or strengthen concordance. No naive p-values are supplied.
+The **Minimum correlation** alternative retains complete linkage cut at `1 - t`,
+so every within-cluster pair has correlation at least `t`. Negative correlations
+remain visible but are not treated as similarity. Both methods cluster all
+nonconstant fields jointly, including diagnostic fields. Group, search and
+cluster filters affect display only. Cluster identifiers are specific to the
+sample scope, correlation method, visit mode, K and clustering settings. Near-tied
+hierarchical merges can differ between R and the browser. Shared-tree validation
+checks the cut independently of these numerical ordering choices.
+
+Selecting an estimate group in **Color by** automatically opens its heatmaps in
+the catalogue panel. The first is a within-group lower triangle, without the
+trivial diagonal; the remaining panels compare that group with each other group.
+The focus rows share one order. Assay-availability comparisons appear in a
+separately labeled, collapsed diagnostics section. **Focus group** and **Compare
+with** permit manual comparisons. The shared scale is −1 to +1. The panel scrolls
+and retains Maximize. **Edge catalogue** dismisses it until the next change of
+estimate color group; **Correlation heatmap…** can reopen it. Changing to ordinary
+sample colors restores the catalogue.
+
+A heatmap cell or feature-table link colors the existing 3D samples without
+changing selection or coordinates. Cluster and its previous/next buttons stay
+outside **Heatmap settings**. The participant-averaging checkbox, shared K and
+Follow graph selection remain available. Saved clustering preferences persist;
+older settings without a clustering method adopt the new defaults.
+
+**Download results ZIP** includes one CSV per heatmap in `matrices/` (full
+symmetric matrices, including their diagonals), a combined `correlations.csv`,
+feature assignments and transformations, the full hierarchy and leaf-ID map,
+exact settings, panel identities, source checksums, a README and methods HTML.
+Subset exports also include `selected_samples.csv`. The methods page provides
+formulas and Print / save as PDF. Correlations describe smoothed estimate fields,
+not raw measurements or significance tests. Shared neighborhoods, compositional
+constraints, assay handling and larger K can strengthen concordance.
+
+On-demand checks (never part of installation or updates):
+
+```sh
+node rank2_feature_graph/test_estimate_correlations.mjs
+node rank2_feature_graph/test_estimate_clustering.mjs
+# Optional reference check; requires R packages dynamicTreeCut and jsonlite:
+Rscript rank2_feature_graph/verify_dynamic_tree_cut.R /tmp/micove-tree-reference.json
+node rank2_feature_graph/test_estimate_clustering.mjs /tmp/micove-tree-reference.json
+# Append a saved correlation-bank JSON to the R command to validate that bank.
+# For ties, compare the branch cut on exactly the browser's hierarchy:
+node rank2_feature_graph/test_estimate_clustering.mjs --tree bank.json /tmp/micove-tree.json
+Rscript rank2_feature_graph/verify_dynamic_tree_cut.R /tmp/micove-tree-reference.json bank.json /tmp/micove-tree.json
+node rank2_feature_graph/test_estimate_clustering.mjs /tmp/micove-tree-reference.json
+```
 
 Each `series` entry describes one available combination:
 

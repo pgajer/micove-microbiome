@@ -55,3 +55,32 @@ run('estimateCorrelationState().follow=false');assert.equal(run('estimateCorrela
 run('estimateCorrelationState().follow=true');context.selectedVertex=null;
 assert.equal(run('estimateCorrelationScope().kind'),'full');
 console.log('PASS: selected edge/vertex membership, cohort restriction, hidden incident states and full-reference toggle.');
+
+// Automatic group selection, lower-triangle masks, common row ordering and all-panel exports.
+context.sampleColorMode=()=> 'estimate:x';
+run('estimateCorrelationColorSync(estimateCorrelationState())');
+assert.equal(run('estimateCorrelationState().open'),true);
+assert.equal(run('estimateCorrelationState().rows'),'x');
+assert.equal(run('estimateCorrelationState().cols'),'all');
+assert.equal(run('estimateCorrelationState().clustering'),'dynamic');
+assert.equal(run('estimateCorrelationState().minSize'),5);
+assert.equal(run('estimateCorrelationState().deepSplit'),1);
+run('estimateCorrelationState().open=false;estimateCorrelationColorSync(estimateCorrelationState())');
+assert.equal(run('estimateCorrelationState().open'),false,'Edge catalogue dismissal lasts within the same color mode');
+context.sampleColorMode=()=> 'estimate:y';run('estimateCorrelationColorSync(estimateCorrelationState())');
+assert.equal(run('estimateCorrelationState().rows'),'y');assert.equal(run('estimateCorrelationState().open'),true);
+context.sampleColorMode=()=> 'default';run('estimateCorrelationColorSync(estimateCorrelationState())');
+assert.equal(run('estimateCorrelationState().open'),false);
+asset.categories=[{id:'x',label:'Group X'},{id:'y',label:'Group Y'},{id:'assay-availability',label:'Assay availability'}];
+run("testPanels=estimateCorrelationPanels(asset,bank,{rows:'x',cols:'all',cluster:'all'},[2,0,1],[2,1,2],[2,0])");
+assert.equal(run('testPanels.length'),3);
+assert.equal(run('testPanels[0].symmetric'),true);
+assert.equal(run('testPanels[2].diagnostic'),true);
+assert.equal(run('testPanels.every(p=>p.rows===testPanels[0].rows)'),true);
+assert.deepEqual(JSON.parse(JSON.stringify(run('estimateCorrelationMatrix(bank,testPanels[0])'))),[[null,null],[.2,null]]);
+run('estimateCorrelationShown.panels=testPanels');
+const expanded=run('estimateCorrelationFiles(estimateCorrelationShown)');
+assert.equal(expanded.filter(f=>f.name.startsWith('matrices/')).length,3);
+assert.match(expanded.find(f=>f.name==='matrices/x--x.csv').text, /"c","1","0.2"/,'Export preserves the full symmetric matrix');
+assert.equal(JSON.stringify({selection,coordinates}),before);
+console.log('PASS: automatic group opening/switching, lower triangles, aligned rows, diagnostics, full-matrix ZIP exports and unchanged selection/coordinates.');
