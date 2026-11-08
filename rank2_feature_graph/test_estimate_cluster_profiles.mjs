@@ -42,3 +42,31 @@ let exported;context.heatmapZip=async files=>{exported=files;return 'zip'};run('
 assert.equal(exported.length,2);assert.match(exported[0].text,/18.75/);assert.equal(JSON.parse(exported[1].text).features.length,2);
 el('sampleColorScheme').value='pure';await run('estimateEnsure();estimateDecorateTraces()');assert.equal(run('estimateCurrent()'),null);assert.equal(plot.data[0].hovertext,null);
 console.log('PASS: participant weights, ties, even medians, missing support, immutable definitions, persisted snapshots, saved-input aggregation, ZIP provenance, fixed colors across selections and unchanged sample coordinates/camera/reference markers.');
+
+// Equal group totals do not depend on the number of members within each group.
+assert.deepEqual(plain(run('jointProfileMemberWeights([0,1,2],asset.correlations.fields,"groups")')),[.25,.25,.5]);
+assert.deepEqual(plain(run('jointProfileScores(input,[0,1,2],4,asset.correlations.fields,"groups").values')),[25,31.25,75,null]);
+assert.deepEqual(plain(run('jointProfileScores(input,[0,1,2],4).values')),[25,37.5,75,null]);
+assert.equal(run('jointProfileWeightedMedian([10,20,30,90],[1/6,1/6,1/6,.5])'),60);
+assert.equal(run('jointProfileWeightedMedian([10,10,20,20,30,30,90],[1/12,1/12,1/12,1/12,1/12,1/12,.5])'),60);
+assert.equal(run('jointProfileWeightedMedian([10,20,30,90],[.25,.25,.25,.25])'),25);
+assert.equal(run('jointProfileWeightedMedian([10,20,20,90],[.25,.25,.25,.25])'),20);
+assert.deepEqual(plain(run('jointProfileScores(input,[0,1],4,asset.correlations.fields,"groups").values')),plain(run('jointProfileScores(input,[0,1],4).values')));
+assert.throws(()=>run('jointProfileMemberWeights([0],[],"groups")'),/feature group/);
+assert.throws(()=>run('jointProfileMemberWeights([0],[],"other")'),/Unknown/);
+el('sampleColorScheme').value='joint-clusters';
+run('const balanced=jointProfileModel();balanced.snapshot={...balanced.snapshot,key:"unequal-groups",clusters:[{id:1,label:"C1 · [f]",members:[0,1,2]}]};balanced.weighting="features";');
+await run('recolorSampleView()');const ordinaryRow=run('estimateCurrent().row'),ordinaryColors=JSON.stringify(plot.data[0].marker.color),pinned=JSON.stringify(run('jointProfileModel().snapshot'));
+const protectedState=JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.text,t.meta]),camera:plot.layout.scene});
+run('jointProfileModel().weighting="groups";jointProfileSave()');await run('recolorSampleView()');
+assert.notEqual(JSON.stringify(plot.data[0].marker.color),ordinaryColors);assert.equal(run('estimateCurrent().row.values[1]'),31.25);
+assert.match(plot.data[0].hovertext[1],/Group-balanced median percentile: 31.25/);
+assert.match(run('estimateColorbarSpec(estimateCurrent()).colorbar.title.text'),/equal groups/);
+assert.equal(pinned,JSON.stringify(run('jointProfileModel().snapshot')));
+assert.equal(protectedState,JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.text,t.meta]),camera:plot.layout.scene}));
+await run('jointProfileExport()');const definition=JSON.parse(exported[1].text);
+assert.equal(definition.weighting,'groups');assert.deepEqual(definition.features.map(f=>f.profileWeight),[.25,.25,.5]);assert.match(exported[0].text,/"31.25","ok","groups"/);
+run('jointProfileModel().weighting="features"');await run('recolorSampleView()');assert.equal(run('estimateCurrent().row'),ordinaryRow);assert.equal(JSON.stringify(plot.data[0].marker.color),ordinaryColors);
+run('delete estimateModel().jointProfiles');assert.equal(run('jointProfileModel().weighting'),'groups');assert.equal(run('jointProfileModel().chosen'),1);
+const savedKey=run('jointProfileKey(asset)'),legacy=JSON.parse(saved.get(savedKey));delete legacy.weighting;saved.set(savedKey,JSON.stringify(legacy));run('delete estimateModel().jointProfiles');assert.equal(run('jointProfileModel().weighting'),'features');
+console.log('PASS: unequal group sizes, tied/half-weight medians, within-group duplication, one-group equivalence, mode-specific caching, restored original colors, saved weighting/default migration and exported feature weights.');

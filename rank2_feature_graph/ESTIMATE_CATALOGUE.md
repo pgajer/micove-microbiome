@@ -477,8 +477,19 @@ selected K. Give each participant total weight one, split equally over their
 reference visits. A weighted mid-distribution percentile counts all lower values
 plus half the weight of tied values, divided by total weight, multiplied by 100.
 Take the median across member features at each visit (average the central two for
-even counts). Every feature has equal weight; groups with more features influence
-the median more. Signs are not flipped. Opposing patterns may cancel. Availability
+even counts). By default every feature has equal weight; groups with more features
+influence the median more. **Weight feature groups equally** instead gives every
+group present in the cluster total weight `1/G`, shared among that group's `n_g`
+members: each feature receives `1/(G × n_g)`. Take the weighted median of the
+feature percentiles. At an exact half-weight split, average the two bounding
+values. For example, ten metabolites and two immune markers receive 50% weight
+per group (5% per metabolite, 25% per immune marker). Absent groups receive no
+weight. This is a weighted median of all feature percentiles, not a median of
+group medians. Participant weighting for the feature percentiles is unchanged.
+The checkbox is initially off, including for older saved settings; the chosen
+weighting is remembered. Switching it changes the composite and color limits,
+while retaining membership, K, feature percentiles and the reference population.
+Signs are not flipped. Opposing patterns may cancel. Availability
 diagnostics are explicitly identified; unassigned and constant fields are excluded.
 
 Cluster membership may come from a graph selection or participant-mean
@@ -494,6 +505,9 @@ at the 2.5th/97.5th percentiles changes only display; profile values remain inta
 produces one ZIP containing `profile.csv` (sample IDs, unmodified scores, support
 status) and `definition.json` (membership, transformations, K, clustering settings,
 reference counts, source revisions, sample-order identity and color limits).
+The definition includes the weighting mode and each feature's normalized weight;
+the CSV and ZIP filename also identify the weighting mode. Availability diagnostics,
+when present, count as a feature group in equal-group mode.
 No estimates, assignments or sample embeddings are refitted or changed.
 
 Focused check: `node rank2_feature_graph/test_estimate_cluster_profiles.mjs`.

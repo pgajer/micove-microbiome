@@ -171,7 +171,7 @@ function estimateTraceIndices(trace){
  return null;
 }
 function estimateHover(index,c){
- if(c.series.joint)return '<br><b>'+esc(c.series.label)+'</b><br>Median feature percentile: '+esc(jointProfileDisplay(c).format(c.row.values[index]))+(Number.isFinite(c.row.values[index])?' (unitless, not a probability)':' · no common estimate support');
+ if(c.series.joint)return '<br><b>'+esc(c.series.label)+'</b><br>'+esc(c.series.quantityLabel)+': '+esc(jointProfileDisplay(c).format(c.row.values[index]))+(Number.isFinite(c.row.values[index])?' (unitless, not a probability)':' · no common estimate support');
  const display=estimateDisplay(c),value=c.row.values[index],status=c.row.status[index]||'unmapped',support=c.row.support||{};
  let text='<br><b>'+esc(estimateModel().features.get(c.series.featureId).label)+' · estimate</b><br>'+esc(c.series.quantityLabel)+': '+esc(estimateValueText(value,c.series))+' '+esc(c.series.unit);
  if(display.mode!=='value'&&Number.isFinite(value))text+='<br>'+esc(display.title)+': '+esc(display.format(display.convert(value)));

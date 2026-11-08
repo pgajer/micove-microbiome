@@ -332,6 +332,7 @@ are not part of installation or updating.
 
 Joint cluster profiles: run `node rank2_feature_graph/test_estimate_cluster_profiles.mjs`
 on demand after changes to cluster coloring or its reference weights. It checks
-ties, repeated participants, missing support, pinned definitions and color-only
+ties, repeated participants, missing support, pinned definitions, equal-feature
+and equal-group medians, weighting persistence, exports and color-only
 updates. Pair it with the estimate-color and correlation tests, then inspect
 LSVF in the browser. These checks remain outside the update command.
