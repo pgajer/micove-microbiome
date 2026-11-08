@@ -82,6 +82,10 @@ coordinates and camera, and appear in PNG exports. Percentiles describe color
 clipping, not uncertainty; CSVs retain the original estimate and add `display_value`,
 `display_mode` and `response_mean`.
 
+The **Target** picker has previous/next buttons in the dropdown order within the
+selected feature group. They stop at each end and use the same saved-field
+selection as the dropdown, preserving other settings where supported.
+
 ## Optional estimate correlations
 
 The `correlations` extension contains an independent revision, one declared
