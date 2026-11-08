@@ -131,8 +131,8 @@ Open **Correlation heatmap…** under **Exploratory estimates**. It occupies the
 catalogue panel and shares its maximize control. Choose groups for the two axes,
 or the same group for a within-group view. A heatmap cell offers links to color
 the existing 3D samples by either field, without changing selection or coordinates.
-The feature table also provides those links. Previous/next buttons beside Cluster
-follow its displayed list, starting with All clusters and stopping at either end.
+The feature table also provides those links. Cluster and its previous/next buttons
+stay visible outside the collapsible Heatmap settings. The buttons follow its displayed list, starting with All clusters and stopping at either end.
 They are unavailable while correlations load or cannot be calculated.
 Settings are remembered per dataset
 and correlation revision.
