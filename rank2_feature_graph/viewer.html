@@ -747,7 +747,7 @@ let sampleRevision=0;function refreshSamples(camera=null){
   const rendering=samples(),key=sampleViewKey();await rendering;sampleRenderedKey=key;
   if(revision===sampleRevision){if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();renderValenciaLegend();renderCountedSampleLegend();renderSampleStress();}
   if(revision===sampleRevision&&camera)await Plotly.relayout('samples',{'scene.camera':copyCamera(camera)});
-  if(revision===sampleRevision)pendingSampleCamera=null;
+  if(revision===sampleRevision){pendingSampleCamera=null;if(typeof saveDatasetSession==='function')saveDatasetSession()}
  }).catch(e=>{el('sampleStatus').textContent='Sample view error: '+e.message;console.error(e)});return queue;
 }
 function selectionSnapshot(){return {enrollmentExploration:explorationSnapshot(),unfoldFaces:unfoldedEnabled(),unfoldAnchorFeatureId:selectedVertex===null?unfoldedAnchorFeatureId:null,participant:participantSnapshot(),rank3:rank3Snapshot(),edgeFaces:edgeFacesSnapshot(),selected,selectedVertex,hiddenEdges:[...hiddenEdges],embedding:el('sampleEmbedding').value,preferredEmbedding:preferredSampleEmbedding,scope:el('scope').value,graphScope:el('graphScope').value,sampleCamera:copyCamera(activeEmbeddingFamily?familyCamera()||defaultCamera:pendingSampleCamera||(sampleRenderedKey===sampleViewKey()?readCamera('samples'):defaultCamera)),graphCamera:copyCamera(pendingGraphCamera||readCamera('graph3d'))}}
@@ -769,7 +769,7 @@ function forwardSelection(){const next=selectionFuture.pop();if(!next)return;sel
 function selectVertex(id){const loading=deferCombSelection('vertex',id,()=>selectVertex(id));if(loading)return loading;if(id===selectedVertex&&!hiddenEdges.size)return;rememberSelection();baselineExplore.visit="off";rank3Clear();hiddenEdges=new Set();selected=null;selectedVertex=id;graph();inspect();table();refreshSamples()}
 function select(id){const loading=deferCombSelection('group',id,()=>select(id));if(loading)return loading;if(id===selected&&selectedVertex===null)return;rememberSelection();baselineExplore.visit="off";if(maxNormalizedView()&&!hasSelection())el('scope').value='selected';rank3Clear();selectedVertex=null;selected=id;graph();inspect();table();refreshSamples()}
 function clearSelection(){longitudinalState.enabled=false;++combSelectionRevision;if(hasSelection()||explorationActive())rememberSelection();baselineExplore.visit="off";rank3Clear();selected=null;selectedVertex=null;hiddenEdges=new Set();graph();inspect();table();return refreshSamples()}
-function draw(camera=null){syncRank3Controls();if(historyCoverage!==el('coverage').value){selectionHistory.length=0;selectionFuture.length=0;historyCoverage=el('coverage').value}hiddenEdges=new Set();const g=current();if(selectedVertex!==null&&!g.nodes.some(n=>n.id===selectedVertex))selectedVertex=null;if(!g.edges.some(e=>e.id===selected))selected=null;positions();el('edgeSelect').innerHTML='<option value="">No edge selected</option>'+g.edges.map(e=>`<option value="${e.id}">${esc(e.key)}: ${esc(e.label)} (n=${e.frequency})</option>`).join('');graph(camera?.eye?camera:null);inspect();table();refreshSamples(camera?.eye?camera:null)}
+function draw(camera=null,keepHidden=false){syncRank3Controls();if(historyCoverage!==el('coverage').value){selectionHistory.length=0;selectionFuture.length=0;historyCoverage=el('coverage').value}if(!keepHidden)hiddenEdges=new Set();const g=current();if(selectedVertex!==null&&!g.nodes.some(n=>n.id===selectedVertex))selectedVertex=null;if(!g.edges.some(e=>e.id===selected))selected=null;positions();el('edgeSelect').innerHTML='<option value="">No edge selected</option>'+g.edges.map(e=>`<option value="${e.id}">${esc(e.key)}: ${esc(e.label)} (n=${e.frequency})</option>`).join('');graph(camera?.eye?camera:null);inspect();table();refreshSamples(camera?.eye?camera:keepHidden?pendingSampleCamera:null)}
 for(const [main,panel] of [['coverage','panelCoverage'],['sampleEmbedding','panelSampleEmbedding']])el(panel).onchange=()=>{el(main).value=el(panel).value;return el(main).onchange()};
 for(const id of ['pureNonCore','panelPureNonCore'])el(id).onchange=()=>changePureCoverage(el(id).checked);
 for(const id of ['graphSphereAmbient','graphSphereHighlights'])el(id).oninput=()=>updateSphereLighting('graph');
@@ -815,7 +815,7 @@ installGraphLayouts();
 if(typeof installDatasetPanelSettings==='function')installDatasetPanelSettings();
 if(typeof restoreDatasetParticipant==='function')restoreDatasetParticipant(initialDatasetView.navigation);
 if(typeof rememberDatasetLocation==='function'&&!embeddingFamilyRegistry.has(requestedDataset))rememberDatasetLocation(META.id);
-draw();queue.then(()=>{
+restoreDatasetSession().then(()=>{draw(pendingSampleCamera?null:defaultCamera,true);return queue}).then(()=>{
  const target=el('samples');
  target.on('plotly_click',ev=>{const point=ev.points[0],id=point?.customdata;
   if(explorationActive()){if(typeof id==='string'&&id.startsWith('enrollment-explore:')&&sampleRenderedKey===sampleViewKey()){const subject=id.slice('enrollment-explore:'.length);if(explorationIndex(participantData().records).some(g=>g.subject===subject&&g.enrollment&&!g.ambiguous))return updateExploration({anchor:subject,nearby:true})}return}

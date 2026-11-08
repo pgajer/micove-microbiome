@@ -8,7 +8,7 @@ const datasetPanelKeys=new Set([
  'vme-sample-information-size-v1','vme-graph-information-size-v1','udcst-explorer-controls-v1',
  'vme-sample-appearance-open-v1','vme-sample-appearance-visits-open-v1',
  'vme-sample-appearance-background-open-v1','vme-sample-appearance-vertices-open-v1',
- 'vme-panel-maximized-v1','vme-panel-controls-v1','vme-panel-details-v1','vme-catalogue-selected-only-v1','vme-pure-non-core-v1'
+ 'micove-session-v1','vme-visit-highlight-appearance-v1','vme-panel-maximized-v1','vme-panel-controls-v1','vme-panel-details-v1','vme-catalogue-selected-only-v1','vme-pure-non-core-v1'
 ]);
 function createDatasetPanelStorage(storage,identity){
  const memory=new Map();
@@ -69,9 +69,12 @@ function createDatasetPanelStorage(storage,identity){
 const datasetPanelNativeStorage=(()=>{try{return typeof window==='undefined'?localStorage:window.localStorage}catch{return null}})();
 const datasetPanelStorage=createDatasetPanelStorage(datasetPanelNativeStorage,()=>{try{return activeEmbeddingFamily?.id||META.id}catch{return META.id}});
 let datasetPanelReady=false,datasetPanelRestoring=false,datasetPanelLayout=null,datasetPanelControlDefaults=null,datasetPanelDetailDefaults=null;
-const datasetPanelControlIds=['dimension','vertexLabels','graphVertexColor','graphEdgeColor','graphVertexScale','graphSpheres','graphSphereAmbient','graphSphereHighlights','sampleReferenceSphereAmbient','sampleReferenceSphereHighlights','sampleReferenceSpheres','sampleReferenceScale','sampleReferenceColor','graphFadeBySize','graphFadeStrength','graphWidthBySize','graphEdgeWidth','graphWidthStrength','graphDegreeFilter','graphMinimumDegree','graphScope','sampleEmbedding','sampleColorScheme','scope','catalogueSelectedOnly','search','trajectoryImageFormat','trajectoryImageScale'];
+let datasetPendingTransitionFocus=null;
+const datasetPanelControlIds=['dimension','vertexLabels','graphVertexColor','graphEdgeColor','graphVertexScale','graphSpheres','graphSphereAmbient','graphSphereHighlights','sampleReferenceSphereAmbient','sampleReferenceSphereHighlights','sampleReferenceSpheres','sampleReferenceScale','sampleReferenceColor','graphFadeBySize','graphFadeStrength','graphWidthBySize','graphEdgeWidth','graphWidthStrength','graphDegreeFilter','graphMinimumDegree','graphScope','sampleEmbedding','sampleColorScheme','scope','catalogueSelectedOnly','search','trajectoryImageFormat','trajectoryImageScale',
+ 'catalogueKind','sampleQuery','heatmapMetric','heatmapOrderDistance','heatmapLinkage','heatmapScale','heatmapClustering','heatmapCutChoice','heatmapK','heatmapKMin','heatmapKMax','heatmapMinSize','heatmapDeepSplit','heatmapMinSamples','heatmapDensityChoice','heatmapRowFirst','heatmapRowLast','heatmapSelectRows',
+ 'stateTransitionLevel','stateTransitionDisplay','stateTransitionArm','stateTransitionFocus','stateTransitionMinimum','stateTransitionLoops','stateTransitionSize','stateTransitionWidth','stateTransitionZoom','transitionBayesPrior','transitionBayesThreshold'];
 function panelReadJson(key,fallback){try{return JSON.parse(datasetPanelStorage.getItem(key))??fallback}catch{return fallback}}
-function panelControlSnapshot(){return Object.fromEntries(datasetPanelControlIds.map(id=>[id,el(id).type==='checkbox'?el(id).checked:el(id).value]))}
+function panelControlSnapshot(){return Object.fromEntries(datasetPanelControlIds.filter(id=>el(id)).map(id=>[id,el(id).type==='checkbox'?el(id).checked:el(id).value]))}
 function saveDatasetPanelSettings(){
  if(!datasetPanelReady||datasetPanelRestoring)return;
  trajectorySavePreference();saveAnnotationSettings();
@@ -83,7 +86,8 @@ function saveDatasetPanelSettings(){
  datasetPanelStorage.setItem(graphLabelSizeKey,String(graphLabelFont.size));
  const controls={version:1,graphSpheresDefaultVersion:1,sampleReferenceSpheresDefaultVersion:1,controls:panelControlSnapshot(),composition:{axis:participant.axis,allTaxa:participant.allTaxa,catalogue:participant.catalogue,stateBackground:participant.stateBackground},catalogueSort:{...catalogueSort},rank3:{enabled:rank3.enabled,mode:rank3.mode,threshold:rank3.threshold,basis:rank3.basis,color:rank3.color,background:rank3.background},fitAll:trajectoryFitAll};
  datasetPanelStorage.setItem('vme-panel-controls-v1',JSON.stringify(controls));
- datasetPanelStorage.setItem('vme-panel-details-v1',JSON.stringify(Object.fromEntries([...document.querySelectorAll('details[id]')].filter(e=>!e.closest('#namedViewsDialog, #viewExportDialog, #familyPanel')).map(e=>[e.id,e.open]))));
+ savePanelDetails();
+ saveDatasetSession();
  if(datasetPanelLayout)datasetPanelLayout.save();
 }
 function restoreDatasetPanelSettings(){
@@ -101,7 +105,8 @@ function restoreDatasetPanelSettings(){
   setGraphLayoutMode(datasetPanelStorage.getItem(graphLayoutPreference));setGraphProportionStrength(datasetPanelStorage.getItem(graphStrengthPreference));setGraphEmbeddingMethod(datasetPanelStorage.getItem(graphMethodPreference));setGraphLabelSize(datasetPanelStorage.getItem(graphLabelSizeKey),false);
   const saved=panelReadJson('vme-panel-controls-v1',null),valid=saved?.version===1;
   const controls={...datasetPanelControlDefaults,...(valid?saved.controls:{})};
-  for(const id of datasetPanelControlIds){const node=el(id),v=controls[id];
+  datasetPendingTransitionFocus=typeof controls.stateTransitionFocus==='string'?controls.stateTransitionFocus:null;
+  for(const id of datasetPanelControlIds){const node=el(id),v=controls[id];if(!node)continue;
    if(node.type==='checkbox'){if(typeof v==='boolean')node.checked=v}
    else if(typeof v==='string'&&(node.tagName!=='SELECT'||[...node.options].some(o=>o.value===v)))node.value=v;
   }
@@ -125,8 +130,7 @@ function restoreDatasetPanelSettings(){
   // Overview is a display state, not a valid preference for a selected group.
   preferredSampleEmbedding=['local','global','reference',...maxNormalizedIds].includes(el('sampleEmbedding').value)?el('sampleEmbedding').value:'local';
   rank3Colors=panelReadJson('vme-rank3-colors-v1',{});if(!rank3Colors||typeof rank3Colors!=='object'||Array.isArray(rank3Colors))rank3Colors={};
-  const details={...datasetPanelDetailDefaults,...panelReadJson('vme-panel-details-v1',{})};
-  for(const [id,v] of Object.entries(details)){const node=document.getElementById(id);if(node?.tagName==='DETAILS'&&typeof v==='boolean')node.open=v}
+  panelDetailsSeen=new WeakSet();restorePanelDetails();
   el('annotationControls').open=annotationSettings.controlsOpen;
   for(const [,id,key] of sampleAppearanceSections)el(id).open=datasetPanelStorage.getItem(key)!=='false';
   el('trajectoryQualityRules').open=datasetPanelStorage.getItem(qualityRulesExpandedKey)==='true';
@@ -149,6 +153,8 @@ function installDatasetPanelSettings(){
  });
  document.addEventListener('toggle',event=>{if(event.target.tagName==='DETAILS')save()},true);
  window.addEventListener('pagehide',save);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save()});
+ if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.tagName==='DETAILS'||n.querySelector?.('details')))))restorePanelDetails()}).observe(document.body,{childList:true,subtree:true});
 }
 
 // Save only committed navigation, never the intermediate state of a plot update.
@@ -181,5 +187,90 @@ function restoreDatasetParticipant(saved){
 }
 function rememberDatasetLocation(id){
  if(typeof window==='undefined'||!window.history?.replaceState)return;
- try{const url=new URL(window.location.href);url.searchParams.set('dataset',id);window.history.replaceState(window.history.state,'',url.href)}catch{}
+ try{datasetPanelStorage.setItem('micove-last-dataset-v1',id);const url=new URL(window.location.href);url.searchParams.set('dataset',id);window.history.replaceState(window.history.state,'',url.href)}catch{}
+}
+
+// Details may be constructed after data load or recreated when heatmaps change.
+// Keep absent sections in storage instead of losing them on the next write.
+let panelDetailsSeen=new WeakSet();
+function panelDetailKey(node){
+ if(node.closest?.('dialog, #familyViewsDialog'))return null;
+ if(node.id)return node.id;
+ const parent=node.parentElement?.closest('[id]'),summary=node.querySelector?.('summary');
+ return parent&&summary?'section:'+parent.id+':'+summary.textContent.trim():null;
+}
+function panelDetailNodes(){return [...document.querySelectorAll('details')].map(node=>[panelDetailKey(node),node]).filter(([key])=>key)}
+function restorePanelDetails(){
+ if(!datasetPanelReady)return;
+ const values={...datasetPanelDetailDefaults,...panelReadJson('vme-panel-details-v1',{})};
+ for(const [key,node] of panelDetailNodes())if(!panelDetailsSeen.has(node)){
+  panelDetailsSeen.add(node);
+  if(!Object.hasOwn(datasetPanelDetailDefaults,key))datasetPanelDetailDefaults[key]=node.open;
+  if(typeof values[key]==='boolean')node.open=values[key];
+ }
+}
+function savePanelDetails(){
+ restorePanelDetails();
+ datasetPanelStorage.setItem('vme-panel-details-v1',JSON.stringify({...panelReadJson('vme-panel-details-v1',{}),...Object.fromEntries(panelDetailNodes().map(([key,node])=>[key,node.open]))}));
+}
+
+// Session snapshots contain identities and display choices, never fitted arrays.
+let datasetSessionReady=false,datasetSessionRestoring=false,datasetSessionDefaults=null;
+function datasetSessionContext(){return [META.id,activeCohort,activeStateMode,el('coverage').value]}
+function restoredTransitionFocus(current){const value=datasetPendingTransitionFocus;datasetPendingTransitionFocus=null;return value??current}
+function sessionAuxiliary(){return {
+ exploration:{...baselineExplore},longitudinal:{...longitudinalState},
+ association:Object.fromEntries(['active','level','coverage','mode','cohort','selected','filter'].map(k=>[k,associationView[k]])),
+ transitions:stateTransitionMode,heatmapDismissed:heatmapDockDismissed,
+ unfoldedChoices:[...unfoldedEdgeChoices],edgeFacesSort:{...edgeFacesSort}
+}}
+function saveDatasetSession(){
+ if(datasetSessionRestoring)return;
+ if(activeEmbeddingFamily){if(typeof saveFamilySession==='function')saveFamilySession();return}
+ if(!datasetSessionReady)return;
+ saveDatasetNavigation();
+ const base=datasetRegistry.get(META.id);
+ datasetPanelStorage.setItem('micove-session-v1',JSON.stringify({version:1,revision:base.dataset.revision,analysisRevision:displayAnalysisRevision(base),context:datasetSessionContext(),selection:selectionSnapshot(),auxiliary:sessionAuxiliary(),pureCoverage:capturePureCoverage()}));
+}
+function sessionCamera(camera){return camera&&['eye','center','up'].every(k=>['x','y','z'].every(a=>Number.isFinite(camera[k]?.[a])))&&Math.hypot(...Object.values(camera.up))>0?camera:null}
+async function restoreDatasetSession(){
+ if(activeEmbeddingFamily)return;
+ datasetSessionReady=false;datasetSessionRestoring=true;const context=JSON.stringify(datasetSessionContext());
+ try{
+  datasetSessionDefaults??=JSON.parse(JSON.stringify(sessionAuxiliary()));
+  const base=datasetRegistry.get(META.id),stored=panelReadJson('micove-session-v1',null);
+  const saved=stored?.version===1&&stored.revision===base.dataset.revision&&stored.analysisRevision===displayAnalysisRevision(base)&&JSON.stringify(stored.context)===JSON.stringify(datasetSessionContext())?stored:null;
+  const aux={...datasetSessionDefaults,...saved?.auxiliary};
+  baselineExplore=explorationDefaults();
+  try{if(aux.exploration?.dataset===META.id){if(aux.exploration.visit!=='off')explorationValidate(aux.exploration,base);baselineExplore={...baselineExplore,...aux.exploration}}}catch{}
+  Object.assign(longitudinalState,datasetSessionDefaults.longitudinal);
+  const l=aux.longitudinal,c=BUNDLE_PACK.longitudinalClusters?.[META.id]?.cohorts[l?.cohort];
+  if(l?.dataset===META.id&&c?.banks[l.metric+'|'+l.distance]?.fits[l.size+'|'+l.split]&&c.results[l.pair]){
+   Object.assign(longitudinalState,l);
+   if(l.subjects){const ids=new Set(c.visits.map(r=>r.subject));longitudinalState.subjects=l.subjects.filter(id=>ids.has(id))}
+  }
+  Object.assign(associationView,datasetSessionDefaults.association);
+  const a=aux.association;
+  if(META.id==='zapps-pressmat-v4'&&['edge','vertex'].includes(a?.level)&&['60','70','80','90'].includes(a.coverage)&&['both','ZAPPS','PreSSMat'].includes(a.cohort)&&['matched','all'].includes(a.mode))Object.assign(associationView,a);
+  for(const [id,key] of [['associationLevel','level'],['associationCoverage','coverage'],['associationMode','mode'],['associationCohort','cohort'],['associationSearch','filter']])if(el(id))el(id).value=associationView[key];
+  stateTransitionMode=aux.transitions===true;heatmapDockDataset=META.id;heatmapDockDismissed=aux.heatmapDismissed===true;heatmapDockIdentity=null;
+  unfoldedEdgeChoices.clear();for(const entry of aux.unfoldedChoices||[])if(Array.isArray(entry)&&typeof entry[0]==='string'&&typeof entry[1]?.enabled==='boolean')unfoldedEdgeChoices.set(entry[0],entry[1]);
+  if(aux.edgeFacesSort)edgeFacesSort={...aux.edgeFacesSort};
+  const s=saved?.selection,g=current();
+  if(s&&(s.selected===null||g.edges.some(e=>e.id===s.selected))&&(s.selectedVertex===null||g.nodes.some(n=>n.id===s.selectedVertex))&&!(s.selected!==null&&s.selectedVertex!==null)){
+   // Deferred comb local assets must arrive before graph inspection or drawing.
+   await ensureNamedViewAssets({dataset:META.id,populationComparison:activeSensitivityMode,cohort:activeCohort,stateMode:activeStateMode,coverage:el('coverage').value,selection:s});
+   if(context!==JSON.stringify(datasetSessionContext()))return;
+   selected=s.selected;selectedVertex=s.selectedVertex;
+   hiddenEdges=new Set((s.hiddenEdges||[]).filter(id=>g.edges.some(e=>e.id===id)));
+   try{validateParticipantView(s.participant,base);validateParticipantBackgroundView(s.participant,base,DATA,activeStateMode);participantRestore(s.participant)}catch{}
+   try{validateRank3View(s.rank3,base);rank3Restore(s.rank3)}catch{}
+   try{validateEdgeFacesView(s,base,DATA);edgeFacesRestore(s.edgeFaces)}catch{}
+   restoreUnfoldedChoice(s);
+   try{validatePureCoverage(saved.pureCoverage,{dataset:META.id,coverage:el('coverage').value,cohort:activeCohort,stateMode:activeStateMode,selection:s});restorePureCoverage(saved.pureCoverage)}catch{}
+   pendingSampleCamera=sessionCamera(s.sampleCamera);pendingGraphCamera=sessionCamera(s.graphCamera);
+  }
+  syncExplorationControls();syncLongitudinalControls();syncParticipantControls();syncRank3Controls();syncAssociations();
+ }catch(error){datasetMessage('Some saved settings could not be restored: '+error.message)}
+ finally{datasetSessionRestoring=false;datasetSessionReady=true}
 }

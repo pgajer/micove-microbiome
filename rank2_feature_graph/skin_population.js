@@ -59,6 +59,15 @@ async function showSkinPopulation(data, choices) {
    new Option('Max-normalized · Euclidean','max-euclidean'),new Option('Max-normalized · L∞','max-linf'));
  for(const input of [selector,method,participant,site,visit,specimen,download,el('toggleControls')])input.disabled=false;
  const url=new URL(location.href);url.searchParams.set('dataset',data.id);history.replaceState(null,'',url);
+ const settingsKey='micove-skin-population-view-v1:'+data.id+'@'+data.revision;
+ let saved={};try{saved=JSON.parse(localStorage.getItem(settingsKey)||'{}')}catch{}
+ const controls=[method,participant,site,visit];
+ for(const n of controls)if([...n.options].some(o=>o.value===saved[n.id]&&!o.disabled))n.value=saved[n.id];
+ if(saved.collapsed===true)el('toggleControls').click();
+ let pendingSpecimen=saved.skinSpecimen;
+ function saveSettings(){try{localStorage.setItem(settingsKey,JSON.stringify({...Object.fromEntries([...controls,specimen].map(n=>[n.id,n.value])),collapsed:el('explorerLayout').classList.contains('controlsCollapsed')}))}catch{}}
+ for(const event of ['change','click'])document.addEventListener(event,saveSettings);
+ window.addEventListener('pagehide',saveSettings);
  let shown=[];
  const visitColor=r=>r.visitOrder===1?'#087f8c':'#cf7318';
  const text=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
@@ -67,7 +76,7 @@ async function showSkinPopulation(data, choices) {
   const bank=data.banks[method.value], coords=bank.coordinates;
   shown=records.filter(r=>(!site.value||r.site===site.value)&&(!visit.value||String(r.visitOrder)===visit.value));
   const subjects=shown.filter(r=>!participant.value||r.participantId===participant.value);
-  const old=specimen.value;
+  const old=pendingSpecimen??specimen.value;pendingSpecimen=null;
   specimen.replaceChildren(new Option('All specimens',''));
   for(const r of subjects)specimen.add(new Option(r.specimenId,r.specimenId));
   if(subjects.some(r=>r.specimenId===old))specimen.value=old;

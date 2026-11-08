@@ -77,7 +77,8 @@ function resolveSkinDataset(id,cohort,cohorts){
 }
 root.VMEAssetLoader={createLoader,mergePack,skinCohorts,groupSkinChoices,resolveSkinDataset};
 if(typeof document==='undefined')return;
-const requested=new URLSearchParams(location.search).get('dataset');
+let requested=new URLSearchParams(location.search).get('dataset');
+if(!requested)try{requested=localStorage.getItem('micove-last-dataset-v1')}catch{}
 if(requested==='empty'){location.replace(new URL('empty.html',location.href).href);return}
 const optionalNode=document.getElementById('vme-optional-neighborhoods'),optional=optionalNode?JSON.parse(optionalNode.textContent):null;
 const primary=JSON.parse(document.getElementById('vme-http-manifest').textContent);
@@ -128,6 +129,7 @@ async function start(id){
  const attempt=++revision;selected=id;loader.retry(null);loader.status('Loading '+(choices.find(x=>x.id===id)?.title||manifest.datasets[id]?.dataset.title||id)+'…');
  try{
   id=resolveSkinDataset(id,new URLSearchParams(location.search).get('cohort'),loader.skinCohorts);
+  try{localStorage.setItem('micove-last-dataset-v1',id)}catch{}
   const dataset=manifest.datasets[id]?id:manifest.neighborhoods.datasets[0];
   library??=script(manifest.plotly).catch(error=>{library=null;throw error});
   const capability=manifest.datasets[id]?.capability;

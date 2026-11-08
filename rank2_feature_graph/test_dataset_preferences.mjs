@@ -213,3 +213,68 @@ console.log('PASS: reference spheres default on, all saved datasets migrated ind
 
 assert.equal(reload.el('graphSphereAmbient').value,'40');assert.equal(reload.el('sampleReferenceSphereHighlights').value,'30');assert.equal(reloadB.el('graphSphereAmbient').value,'85');assert.equal(reloadB.el('sampleReferenceSphereHighlights').value,'18');
 console.log('PASS: independent graph/reference lighting survives dataset switching and reload; older datasets retain material defaults.');
+
+// A real session snapshot restores model-backed widgets, not merely DOM values.
+const session=setup('session');session.run(`
+ let activeCohort='all',activeStateMode='merged',DATA={records:[]};
+ el('coverage').value='60';
+ const base={dataset:{id:'session',revision:'r1'}};
+ const datasetRegistry=new Map([['session',base],['other',{dataset:{id:'other',revision:'r1'}}]]);
+ const displayAnalysisRevision=()=> 'analysis1';
+ let selected=null,selectedVertex=4,hiddenEdges=new Set(['4,5']);
+ const current=()=>({nodes:[{id:4},{id:5}],edges:[{id:'4,5'}]});
+ const explorationDefaults=()=>({dataset:null,visit:'off',k:20});let baselineExplore={dataset:'session',visit:'enrollment',k:40};
+ const longitudinalState={dataset:'session',enabled:false};const associationView={active:false,level:'edge',coverage:'90',mode:'matched',cohort:'both',selected:null,filter:'',bank:'not serialized'};
+ let stateTransitionMode=true,heatmapDockDismissed=true,heatmapDockDataset=null,heatmapDockIdentity=null;
+ const unfoldedEdgeChoices=new Map([['edge',{anchor:4,enabled:false}]]);let edgeFacesSort={key:'edgeCount',descending:true};
+ const camera={eye:{x:1,y:2,z:3},center:{x:0,y:0,z:0},up:{x:0,y:0,z:1}};
+ let pendingSampleCamera=null,pendingGraphCamera=null;
+ const selectionSnapshot=()=>({selected,selectedVertex,hiddenEdges:[...hiddenEdges],participant:{active:false},rank3:{enabled:false},edgeFaces:null,unfoldFaces:false,sampleCamera:camera,graphCamera:camera});
+ const capturePureCoverage=()=>null,restorePureCoverage=()=>{},validatePureCoverage=()=>{};
+ const BUNDLE_PACK={},activeSensitivityMode='baseline';let loaded=false,unfolded=null;
+ const ensureNamedViewAssets=async()=>{loaded=true};
+ const validateParticipantView=()=>{},validateParticipantBackgroundView=()=>{},participantRestore=s=>{participant=s};
+ const validateEdgeFacesView=()=>{},edgeFacesRestore=()=>{},rank3Restore=s=>{rank3=s};
+ const restoreUnfoldedChoice=s=>{unfolded=s.unfoldFaces};
+ const explorationValidate=()=>{},syncExplorationControls=()=>{},syncLongitudinalControls=()=>{},syncAssociations=()=>{};
+ const datasetMessage=message=>{throw Error(message)};
+ datasetSessionReady=true;saveDatasetSession();
+ selectedVertex=null;hiddenEdges.clear();baselineExplore=explorationDefaults();stateTransitionMode=false;heatmapDockDismissed=false;
+`);
+await session.run('restoreDatasetSession()');
+assert.equal(session.run('selectedVertex'),4);assert.equal(session.run('hiddenEdges.has("4,5")'),true);
+assert.equal(session.run('baselineExplore.k'),40);assert.equal(session.run('baselineExplore.visit'),'enrollment');
+assert.equal(session.run('stateTransitionMode'),true);assert.equal(session.run('heatmapDockDismissed'),true);
+assert.equal(session.run('loaded'),true);assert.equal(session.run('unfolded'),false);
+assert.equal(session.run('pendingSampleCamera.eye.y'),2);
+const payload=JSON.parse(session.run("datasetPanelStorage.getItem('micove-session-v1')"));assert(!('bank' in payload.auxiliary.association));
+// A changed data release cannot silently restore old memberships/participant IDs.
+session.run("base.dataset.revision='r2';selectedVertex=null");await session.run('restoreDatasetSession()');assert.equal(session.run('selectedVertex'),null);
+session.run("META={id:'other'};selectedVertex=null");await session.run('restoreDatasetSession()');assert.equal(session.run('selectedVertex'),null);assert.equal(session.run('baselineExplore.visit'),'off');
+// Newly constructed details restore before being saved, and absent details survive saves.
+const dynamic=setup('dynamic');dynamic.run("datasetPanelStorage.setItem('vme-panel-details-v1',JSON.stringify({later:false,absent:true}));restoreDatasetPanelSettings()");
+const node=dynamic.el('later');Object.assign(node,{tagName:'DETAILS',open:true,closest:()=>false});dynamic.run("document.querySelectorAll=()=>[el('later')];restorePanelDetails();savePanelDetails()");assert.equal(node.open,false);
+assert.equal(dynamic.run("panelReadJson('vme-panel-details-v1',{}).absent"),true);
+node.open=true;dynamic.run('savePanelDetails()');dynamic.run("document.querySelectorAll=()=>[];savePanelDetails()");assert.equal(dynamic.run("panelReadJson('vme-panel-details-v1',{}).later"),true);
+console.log('PASS: revision-checked graph/exploration session, deferred assets, hidden edges, unfolding, analysis modes and late/absent sections.');
+
+// Neighborhoods keep their linked graph selection independently of ordinary datasets.
+const familySource=fs.readFileSync('rank2_feature_graph/embedding_families.js','utf8');
+session.run(familySource.slice(familySource.indexOf('function familySessionContext'),familySource.indexOf('function familyGraphState')));
+session.run(`
+ const localStorage=window.localStorage;let familyGraphReady=true;
+ const familySelection={collection:'session'};activeEmbeddingFamily={id:'neighborhood',revision:'f1'};
+ META={id:'session'};selectedVertex=4;selected=null;hiddenEdges=new Set(['4,5']);
+ saveFamilySession();
+`);
+// The fixture's rank-3 validator expects a mode; real snapshots already include it.
+session.run(`const storedFamily=readFamilySession();storedFamily.selection.rank3.mode='count';`);
+assert.equal(session.run('validFamilySession(storedFamily)'),true);
+session.run("storedFamily.context[1]='outdated'");assert.equal(session.run('validFamilySession(storedFamily)'),false);
+session.run("storedFamily.context[1]='f1';storedFamily.selection.selectedVertex=999");assert.equal(session.run('validFamilySession(storedFamily)'),false);
+session.run(`
+ storedFamily.selection.selectedVertex=4;loaded=false;let familyRestored=false;
+ const restoreSelection=async s=>{if(!loaded)throw Error('Missing deferred local fit');familyRestored=s.selectedVertex===4};
+`);
+await session.run('restoreFamilySession(storedFamily)');assert.equal(session.run('familyRestored'),true);
+console.log('PASS: neighborhood graph snapshots are isolated and reject changed references or missing vertices.');

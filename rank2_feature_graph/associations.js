@@ -112,6 +112,7 @@ function associationRows(release,cohorts,filter=''){
 function associationChoose(id){associationView.selected=id;renderAssociations();}
 function syncAssociations(){
  if(typeof window==='undefined'||!window.VME_ASSOCIATIONS_INSTALLED)return;
+ for(const [id,key] of [['associationLevel','level'],['associationCoverage','coverage'],['associationMode','mode'],['associationCohort','cohort'],['associationSearch','filter']])el(id).value=associationView[key];
  const supported=META.id==='zapps-pressmat-v4'&&!(typeof activeEmbeddingFamily!=='undefined'&&activeEmbeddingFamily);
  let error='';
  try{if(supported&&BUNDLE_PACK.associationResults?.[META.id])associationView.bank=validateAssociationBank(BUNDLE_PACK.associationResults[META.id])}catch(e){associationView.bank=null;error=e.message}

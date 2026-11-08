@@ -192,7 +192,7 @@ function syncEnrollmentHeatmapPanel(){
  enrollmentHeatmapSelection.subjects=subjects;
  if(heatmapDockIdentity!==identity||wasHidden){
   heatmapDockIdentity=identity;
-  if(wasHidden)el('heatmapMetric').value=baselineExplore.metric;
+  if(wasHidden&&!(typeof panelReadJson==='function'&&panelReadJson('vme-panel-controls-v1',{}).controls?.heatmapMetric))el('heatmapMetric').value=baselineExplore.metric;
   // Let panel visibility/layout settle before Plotly measures its width.
   if(typeof window!=='undefined')requestAnimationFrame(()=>drawEnrollmentHeatmap().catch(heatmapError));
  }else if(changed&&el('enrollmentHeatmapPlot').data)syncHeatmapSelection();

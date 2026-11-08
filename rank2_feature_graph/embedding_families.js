@@ -124,6 +124,27 @@ function familyGraphMembership(hood,state){
  const ring=hood.profileIndices.map((p,i)=>mask[i]&&pairs[p]===state.edge&&rings.has(triples[p]));
  return {active,mask,ring,triples:hood.profileIndices.map(p=>triples[p]),pairs:hood.profileIndices.map(p=>pairs[p]),count:mask.filter(Boolean).length};
 }
+function familySessionContext(){return [activeEmbeddingFamily.id,activeEmbeddingFamily.revision,familySelection.collection,datasetRegistry.get(familySelection.collection).dataset.revision,activeStateMode,el('coverage').value]}
+function readFamilySession(){try{return JSON.parse(localStorage.getItem('micove-neighborhood-session-v1:'+activeEmbeddingFamily.id))}catch{return null}}
+function saveFamilySession(){
+ if(!familyGraphReady||!activeEmbeddingFamily||typeof selectionSnapshot!=='function'||typeof datasetPanelRestoring!=='undefined'&&datasetPanelRestoring)return;
+ try{localStorage.setItem('micove-neighborhood-session-v1:'+activeEmbeddingFamily.id,JSON.stringify({context:familySessionContext(),selection:selectionSnapshot()}))}catch{}
+}
+function validFamilySession(saved){
+ if(!saved||JSON.stringify(saved.context)!==JSON.stringify(familySessionContext()))return false;
+ const s=saved.selection,g=current();
+ if(!s||s.participant?.active||s.selected!==null&&!g.edges.some(e=>e.id===s.selected)||s.selectedVertex!==null&&!g.nodes.some(n=>n.id===s.selectedVertex)||s.selected!==null&&s.selectedVertex!==null||!Array.isArray(s.hiddenEdges)||s.hiddenEdges.some(id=>!g.edges.some(e=>e.id===id)))return false;
+ try{validateRank3View(s.rank3,datasetRegistry.get(META.id));validateEdgeFacesView(s,datasetRegistry.get(META.id),DATA)}catch{return false}
+ return true;
+}
+async function restoreFamilySession(saved){
+ if(!validFamilySession(saved))return;
+ const context=JSON.stringify(familySessionContext());
+ // The shared selection inspector also reads the reference's saved local fit.
+ await ensureNamedViewAssets({dataset:META.id,populationComparison:activeSensitivityMode,cohort:activeCohort,stateMode:activeStateMode,coverage:el('coverage').value,selection:saved.selection});
+ if(!activeEmbeddingFamily||context!==JSON.stringify(familySessionContext()))return;
+ await restoreSelection(saved.selection);
+}
 function familyGraphState(){
  return {mode:activeStateMode,coverage:el('coverage').value,edge:selected,vertex:selectedVertex,hiddenEdges:[...hiddenEdges],incident:selectedVertex===null?[]:incidentEdges().map(e=>e.id),
   faces:rank3UsesSamples()?(rank3View().active?rank3View().selected:rank3View().rows).map(r=>r.id):null,rings:edgeFacesActive()?edgeFaces.checked:[]};
@@ -409,7 +430,8 @@ function syncFamilySelectors(){
  el('datasetSummary').textContent=f.title+' · '+f.neighborhoods.length+' separately defined neighborhoods';
  el('legacyLinks').hidden=true;
  document.title='MiCOVE — '+f.title;
- try{localStorage.setItem(familyPreferenceKey,JSON.stringify({family:f.id,revision:f.revision,selection:s}))}catch{}
+ saveFamilySession();
+ try{localStorage.setItem(familyPreferenceKey,JSON.stringify({family:f.id,revision:f.revision,selection:s,maximized:document.body.classList.contains('familyMaximized')}))}catch{}
 }
 function renderFamily(camera=null){
  familyCancelLabelDrag();familyLabelTargets=[];
@@ -488,14 +510,15 @@ async function activateEmbeddingFamily(id,bookmark=null){
  if(typeof saveDatasetPanelSettings==='function')saveDatasetPanelSettings();
  if(typeof datasetPanelRestoring!=='undefined')datasetPanelRestoring=true;
  try{for(const button of document.querySelectorAll('.maximizePanel[aria-expanded="true"]'))button.click()}finally{if(typeof datasetPanelRestoring!=='undefined')datasetPanelRestoring=false}
- let saved=null;try{const p=JSON.parse(localStorage.getItem(familyPreferenceKey));if(p?.family===id&&p.revision===f.revision)saved=p.selection}catch{}
+ let saved=null,maximized=false;try{const p=JSON.parse(localStorage.getItem(familyPreferenceKey));if(p?.family===id&&p.revision===f.revision){saved=p.selection;maximized=p.maximized===true}}catch{}
  if(typeof rememberDatasetLocation==='function')rememberDatasetLocation(id);
  activeEmbeddingFamily=f;familyGraphReady=false;familySelection=familyDefaults(f,bookmark?.selection||saved||familySelection||{});
  document.body.classList.add('embeddingFamilyActive');el('familyPanel').hidden=false;
- const selection=familySelection;
+ const selection=familySelection,resume=bookmark?null:readFamilySession();
  syncFamilySelectors();refreshFamilyBookmarks();await prepareFamilyGraph();
  if(!familyGraphReady||activeEmbeddingFamily!==f||familySelection!==selection)return;
- await renderFamily(bookmark?.camera||null);window.dispatchEvent(new Event('resize'));
+ await restoreFamilySession(resume);
+ await renderFamily(bookmark?.camera||null);if(!bookmark&&maximized&&!document.body.classList.contains('familyMaximized'))el('familyMaximize').click();window.dispatchEvent(new Event('resize'));
 }
 async function leaveEmbeddingFamily(revision=datasetSwitchRevision){
  if(!activeEmbeddingFamily)return;
@@ -643,7 +666,7 @@ function installEmbeddingFamilies(){
  for(const [id,field] of [['familyColorMode','colorMode'],['familyColorCoverage','colorCoverage']])el(id).onchange=()=>{const camera=familyCamera();familySelection[field]=el(id).value;syncFamilySelectors();renderFamily(camera).catch(report)};
  for(const [id,field] of [['familyShowVertices','showVertices'],['familyVertexScope','vertexScope'],['familyVertexLabelSize','vertexLabelSize']])el(id).onchange=()=>{const camera=familyCamera();familySelection[field]=field==='showVertices'?el(id).checked:field==='vertexLabelSize'?Number(el(id).value):el(id).value;syncFamilySelectors();renderFamily(camera).catch(report)};
  el('familyResetCamera').onclick=()=>Plotly.relayout('familyPlot',{'scene.camera':{eye:{x:1.25,y:1.25,z:1.25},up:{x:0,y:0,z:1},center:{x:0,y:0,z:0}}});
- el('familyMaximize').onclick=()=>{const active=document.body.classList.toggle('familyMaximized');el('familyMaximize').textContent=active?'↙ Restore':'⛶ Maximize';el('familyMaximize').setAttribute('aria-expanded',String(active));Plotly.Plots.resize(el('familyPlot'))};
+ el('familyMaximize').onclick=()=>{const active=document.body.classList.toggle('familyMaximized');el('familyMaximize').textContent=active?'↙ Restore':'⛶ Maximize';el('familyMaximize').setAttribute('aria-expanded',String(active));Plotly.Plots.resize(el('familyPlot'));if(activeEmbeddingFamily&&(typeof datasetPanelRestoring==='undefined'||!datasetPanelRestoring))syncFamilySelectors()};
  window.addEventListener('resize',()=>{if(activeEmbeddingFamily)Plotly.Plots.resize(el('familyPlot'))});
  window.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('familyMaximized'))el('familyMaximize').click()});
  for(const [suffix,field] of [['Spheres','spheres'],['Scale','scale'],['Color','color'],['Ambient','ambient'],['Highlights','highlights']]){

@@ -336,3 +336,13 @@ ties, repeated participants, missing support, pinned definitions, equal-feature
 and equal-group medians, weighting persistence, exports and color-only
 updates. Pair it with the estimate-color and correlation tests, then inspect
 LSVF in the browser. These checks remain outside the update command.
+
+
+Remembered widget settings: run `node rank2_feature_graph/test_dataset_preferences.mjs`
+after changes to session persistence. Check actual reloads and dataset switching
+as well as model-backed controls, selected graph states, and late-created sections.
+Settings are browser-local and dataset-specific. They survive reopening the same
+address; an explicit dataset link overrides the remembered last dataset. Stored
+selections are checked against dataset/analysis revisions. Clearing browser storage
+or changing the browser/profile or port starts a separate set of preferences.
+File inputs, downloads and open dialogs are transient. Named views remain separate.

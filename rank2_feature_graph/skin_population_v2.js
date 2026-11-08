@@ -143,7 +143,7 @@ async function showSkinPopulationV2(data, choices) {
  const detail=el('sampleContext');el('sampleSidePanels').replaceChildren(detail);detail.style.padding='0 10px';
  el('sampleInfoDivider').setAttribute('role','presentation');el('sampleInfoDivider').removeAttribute('tabindex');el('sampleInfoDivider').style.pointerEvents='none';
  const viewControls=document.createElement('section');viewControls.className='sampleViewControls';viewControls.setAttribute('aria-label','Sample view settings');
- const coloring=document.createElement('details');coloring.className='sampleColoringControls';coloring.open=true;
+ const coloring=document.createElement('details');coloring.id='skinColorControls';coloring.className='sampleColoringControls';coloring.open=true;
  const coloringTitle=document.createElement('summary');coloringTitle.textContent='Sample coloring';coloring.append(coloringTitle,colorField,assignField);
  viewControls.append(method.closest('label'),coloring);el('sampleSidePanels').prepend(viewControls);
  panel.querySelector('.sampleHeaderActions').replaceChildren(clear,save,maximize);
@@ -156,6 +156,25 @@ async function showSkinPopulationV2(data, choices) {
  const url=new URL(location.href);url.searchParams.set('dataset','skin');url.searchParams.set('cohort',data.id);history.replaceState(null,'',url);
  el('toggleControls').onclick=()=>{const closed=el('explorerLayout').classList.toggle('controlsCollapsed');el('controlSections').hidden=closed;el('toggleControls').textContent=closed?'›':'‹';requestAnimationFrame(()=>Plotly.Plots.resize(plot))};
  maximize.onclick=()=>{const open=panel.dataset.skinMaximized!=='true';panel.dataset.skinMaximized=String(open);panel.style.position=open?'fixed':'';panel.style.inset=open?'8px':'';panel.style.zIndex=open?'1000':'';panel.style.height=open?'calc(100vh - 16px)':states?'60%':'100%';maximize.textContent=open?'Restore':'⛶ Maximize';maximize.setAttribute('aria-expanded',String(open));requestAnimationFrame(()=>Plotly.Plots.resize(plot))};
+ // Cohort-specific UI state; no specimen measurements or fitted coordinates.
+ const settingNodes=[method,participant,site,visit,paths];
+ for(const n of settingNodes){const value=saved.controls?.[n.id];if(n.type==='checkbox'){if(typeof value==='boolean')n.checked=value}else if([...n.options].some(o=>o.value===value&&!o.disabled))n.value=value}
+ const gs=saved.graphSelection;
+ if(states&&gs&&(gs.kind==='vertex'&&states.categories.some(c=>c.id===gs.id)||gs.kind==='edge'&&states.levels[coverage.value].cores.includes(gs.id)))graphSelection={kind:gs.kind,id:gs.id};
+ if(typeof saved.coloringOpen==='boolean')coloring.open=saved.coloringOpen;
+ for(const n of document.querySelectorAll('details[id]'))if(typeof saved.details?.[n.id]==='boolean')n.open=saved.details[n.id];
+ if(saved.collapsed===true)el('toggleControls').click();
+ if(saved.maximized===true)maximize.click();if(saved.graphMaximized===true&&states)graphMax.click();
+ let settingsReady=false,pendingSpecimen=typeof saved.specimen==='string'?saved.specimen:null;
+ function saveSettings(){
+  if(!settingsReady)return;
+  try{localStorage.setItem(settingsKey,JSON.stringify({coverage:coverage.value,assignRemaining:assign.checked,colorBy:colorBy.value,
+   controls:Object.fromEntries(settingNodes.map(n=>[n.id,n.type==='checkbox'?n.checked:n.value])),specimen:specimen.value,graphSelection,
+   coloringOpen:coloring.open,details:Object.fromEntries([...document.querySelectorAll('details[id]')].map(n=>[n.id,n.open])),collapsed:el('explorerLayout').classList.contains('controlsCollapsed'),maximized:panel.dataset.skinMaximized==='true',graphMaximized:graphPanel.dataset.maximized==='true'}))}catch{}
+ }
+ for(const event of ['input','change','click','toggle'])document.addEventListener(event,saveSettings,event==='toggle');
+ window.addEventListener('pagehide',saveSettings);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveSettings()});
  let subjects=[], edges=[], drawVersion=0, downloadLinks=[];
  const colors=['#0072b2','#d55e00','#009e73','#cc79a7','#e69f00','#56b4e9','#882255','#444444'];
  const stateKey=(r,mode=colorBy.value)=>mode==='pure'?states.pure[stateIndex.get(r.specimenId)]:states.levels[coverage.value].assignments[stateIndex.get(r.specimenId)];
@@ -174,10 +193,10 @@ async function showSkinPopulationV2(data, choices) {
  async function draw(){
   const version=++drawVersion, bank=data.banks[method.value],co=bank.coordinates;
   colorBy.options[0].textContent=coverage.value+'% genus 2-CSTs';
-  try{localStorage.setItem(settingsKey,JSON.stringify({coverage:coverage.value,assignRemaining:assign.checked,colorBy:colorBy.value}))}catch{}
+  saveSettings();
   ({subjects,edges}=skinPopulationSelection(data,{site:site.value,visit:visit.value,participant:participant.value,paths:paths.checked,coverage:coverage.value,assignRemaining:assign.checked,graphSelection}));
   drawGraph({site:site.value,visit:visit.value,participant:participant.value,coverage:coverage.value,assignRemaining:assign.checked});
-  const old=specimen.value;specimen.replaceChildren(new Option('All specimens',''));for(const r of subjects)specimen.add(new Option(r.specimenId,r.specimenId));if(subjects.some(r=>r.specimenId===old))specimen.value=old;
+  const old=pendingSpecimen??specimen.value;pendingSpecimen=null;specimen.replaceChildren(new Option('All specimens',''));for(const r of subjects)specimen.add(new Option(r.specimenId,r.specimenId));if(subjects.some(r=>r.specimenId===old))specimen.value=old;
   previous.disabled=participant.selectedIndex<=1;next.disabled=participant.selectedIndex>=participant.options.length-1;
   const traces=[];
   function trace(ids,props){if(ids.length)traces.push({type:'scatter3d',ids,x:ids.map(i=>co[i][0]),y:ids.map(i=>co[i][1]),z:ids.map(i=>co[i][2]),showlegend:false,...props})}
@@ -239,5 +258,5 @@ async function showSkinPopulationV2(data, choices) {
    const raw=await(await fetch(uri)).blob();download(raw,'samples.png','image/png');
   }catch(error){const p=document.createElement('p');p.textContent='PNG export failed: '+error.message;detail.append(p)}finally{Plotly.purge(box);box.remove();save.disabled=false}
  };
- await draw();
+ await draw();settingsReady=true;saveSettings();
 }

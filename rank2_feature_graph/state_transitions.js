@@ -95,7 +95,7 @@ function vertexTransitionMatrix(fit,focus=''){
 }
 function renderVertexTransitions(model,bundle,q,timing){
  const fit=fitVertexTransitions(model,bundle.cohortAnalysis.merged[q].cores,bundle.data.graphs['100']);
- const old=el('stateTransitionFocus').value;el('stateTransitionFocus').innerHTML='<option value="">All vertices</option>'+fit.vertices.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');el('stateTransitionFocus').value=fit.vertices.some(v=>v.id===old)?old:'';
+ const old=typeof restoredTransitionFocus==='function'?restoredTransitionFocus(el('stateTransitionFocus').value):el('stateTransitionFocus').value;el('stateTransitionFocus').innerHTML='<option value="">All vertices</option>'+fit.vertices.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');el('stateTransitionFocus').value=fit.vertices.some(v=>v.id===old)?old:'';
  const focus=el('stateTransitionFocus').value,bayes=el('stateTransitionDisplay').value==='bayes';
  el('featurePanelTitle').textContent=q+'% vertex-union '+(bayes?'treatment comparison':'transitions');
  el('stateTransitionFocusLabel').textContent='Vertex';el('stateTransitionArm').disabled=true;
@@ -187,7 +187,7 @@ function renderStateTransitions(){
  const coreKeys=new Map(bundle.cohortAnalysis.merged[q].cores.map((id,i)=>[id,'G'+(i+1)]));
  const labels=new Map(bundle.data.graphs['100'].edges.map((e,i)=>[e.id,{key:coreKeys.get(e.id)||'S'+(i+1),name:legendCstLabel(e.id,bundle,true,e.label||stateDisplayLabel(e.id))}]));
  model.nodes.forEach(n=>{if(!labels.has(n.id))labels.set(n.id,{key:String(n.id),name:String(n.id)})});
- const old=el('stateTransitionFocus').value;el('stateTransitionFocus').innerHTML='<option value="">All states</option>'+model.nodes.map(n=>`<option value="${esc(n.id)}">${esc(labels.get(n.id).key+': '+labels.get(n.id).name)}</option>`).join('');el('stateTransitionFocus').value=labels.has(old)?old:'';
+ const old=typeof restoredTransitionFocus==='function'?restoredTransitionFocus(el('stateTransitionFocus').value):el('stateTransitionFocus').value;el('stateTransitionFocus').innerHTML='<option value="">All states</option>'+model.nodes.map(n=>`<option value="${esc(n.id)}">${esc(labels.get(n.id).key+': '+labels.get(n.id).name)}</option>`).join('');el('stateTransitionFocus').value=labels.has(old)?old:'';
  const focus=el('stateTransitionFocus').value,minimum=Math.max(1,Number(el('stateTransitionMinimum').value)||1),loops=el('stateTransitionLoops').checked;
  const options={focus,minimum,loops,scale:Number(el('stateTransitionSize').value),width:Number(el('stateTransitionWidth').value)};
  const bayes=el('stateTransitionDisplay').value==='bayes';el('transitionBayesControls').hidden=!bayes;el('exportTransitionBayes').hidden=!bayes;el('exportTransitionModel').hidden=bayes;

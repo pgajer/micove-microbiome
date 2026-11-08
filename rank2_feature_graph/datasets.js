@@ -111,6 +111,7 @@ async function switchDataset(id,{recall=true}={}){
  await Promise.all([queue,graphQueue]);
  if(revision!==datasetSwitchRevision)return;
  if(useDefault&&id==='comb-V3V4-tx')selectSensitivityData(defaultPopulationComparison(id));
+ datasetSessionReady=false;
  const bundle=datasetRegistry.get(id),view=datasetActivationView(bundle,'all',recall);
  participant.active=false;participant.key='';participant.record=null;
  DATA=view.data;META=view.meta;
@@ -118,8 +119,10 @@ async function switchDataset(id,{recall=true}={}){
  datasetPresentation(view.coverage);historyCoverage=view.coverage;
  if(typeof restoreDatasetPanelSettings==='function')restoreDatasetPanelSettings();
  if(typeof restoreDatasetParticipant==='function')restoreDatasetParticipant(view.navigation);
+ if(typeof restoreDatasetSession==='function')await restoreDatasetSession();
+ if(revision!==datasetSwitchRevision)return;
  if(typeof rememberDatasetLocation==='function')rememberDatasetLocation(id);
- draw(defaultCamera);
+ draw(pendingSampleCamera?null:defaultCamera,true);
  await Promise.all([queue,graphQueue]);
 }
 async function registerDataset(bundle){
