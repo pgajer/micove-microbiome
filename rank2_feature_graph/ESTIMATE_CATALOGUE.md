@@ -144,7 +144,16 @@ checks the cut independently of these numerical ordering choices.
 Selecting an estimate group in **Color by** automatically opens its heatmaps in
 the catalogue panel. The first is a within-group lower triangle, without the
 trivial diagonal; the remaining panels compare that group with each other group.
-The focus rows share one order. Assay-availability comparisons appear in a
+The focus rows share one order. Cluster boundary lines appear on both axes;
+within-group lines stop at the diagonal. Labels use **C3 · [feature name]**,
+with the same numeric ID as the Cluster dropdown. The representative maximizes
+mean signed correlation to the other members of the full joint cluster
+(equivalently, minimizes mean distance `1 - r`). Numerical ties within `1e-12`
+use frozen feature order. Singletons represent themselves; Unassigned fields
+have no representative. The representative may come from another feature group.
+It is a descriptive label, not evidence of biological importance. Display filters
+never change representatives; changes to samples or calculation settings can.
+Compact axis codes and hover strips share a full-label key above each heatmap. Assay-availability comparisons appear in a
 separately labeled, collapsed diagnostics section. **Focus group** and **Compare
 with** permit manual comparisons. The shared scale is −1 to +1. The panel scrolls
 and retains Maximize. **Edge catalogue** dismisses it until the next change of
@@ -159,7 +168,8 @@ older settings without a clustering method adopt the new defaults.
 
 **Download results ZIP** includes one CSV per heatmap in `matrices/` (full
 symmetric matrices, including their diagonals), a combined `correlations.csv`,
-feature assignments and transformations, the full hierarchy and leaf-ID map,
+feature assignments and transformations, `cluster_representatives.csv` with
+representative IDs and mean correlations, the full hierarchy and leaf-ID map,
 exact settings, panel identities, source checksums, a README and methods HTML.
 Subset exports also include `selected_samples.csv`. The methods page provides
 formulas and Print / save as PDF. Correlations describe smoothed estimate fields,
