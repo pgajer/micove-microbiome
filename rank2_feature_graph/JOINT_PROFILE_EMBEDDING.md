@@ -4,17 +4,19 @@
 
 Do visits with similar combinations of estimated immune, metabolic, taxonomic
 and clinical patterns lie near one another? This representation places **visits**
-in three dimensions. Its input columns are feature-cluster profiles; the 39
+in three dimensions. Its input columns are feature-cluster profiles; the feature
 clusters themselves are not the plotted points.
 
-Choose **Representation → Joint cluster profiles · 3D** at the top of the sample
+Choose **Representation → Joint profiles · Outcomes excluded** or
+**Joint profiles · Original (outcomes included)** at the top of the sample
 sidebar. **Taxonomic composition** returns to the existing embeddings. State,
 cohort and participant selections restrict the fixed profile map. They do not
 refit it. Coloring, navigation and PNG export work in either representation.
 Taxonomic reference vertices and face unfolding apply only to composition space.
 
 **Find feature in clusters…** searches recorded feature names. For example,
-“any STI” finds **Any incident STI**, in **C9** of the frozen pilot definition.
+“any STI” finds **Any incident STI**. It is excluded from the new clustering
+and remains available for coloring. The original definition retains it in C9.
 The search shows the feature group, cluster membership and grouped member list.
 Choose **This feature** to color by its saved estimate, or **Cluster profile**
 for the aggregate. When a joint heatmap is open, its current cluster definition
@@ -25,7 +27,42 @@ provides the profile formulas and download. **Color 3D samples** beside a
 heatmap cluster explicitly adopts that definition for coloring; the saved 3D
 map remains unchanged.
 
-## Frozen input and profile definition
+## Outcome-excluded representation
+
+The additive LSVF v4 supplement preserves the original 39-profile representation
+and every saved individual estimate. It adds a new 38-profile map. Its explicit
+exclusion policy removes 23 fields from correlation displays and from both joint
+and separate clustering: four incident-STI fields; seven reported-condition
+fields (`diabet`, `mvp`, `thyroid`, `asthma`, `allergy`, `s_cell`, `anemia`);
+all four `health` categories; `metro` and `yeasttx` treatment-use fields;
+visit number; and five assay-availability indicators. Original wording and
+uncertain questionnaire definitions are retained. BV/Nugent scores are absent
+from this metadata source. All excluded targets remain individually colorable.
+
+The 1,096 remaining nonconstant fields form 38 clusters using the same full
+reference and settings below. The new map contains 1,965 visits from 1,144
+participants and 1,963 distinct vectors. Independent percentile/median and
+all-pair error calculations agree with the packaged results. RMS relative
+error is **19.84%**, versus **35.61%** for its initial PCA projection, over
+1,929,628 positive-distance pairs; two zero-distance pairs are excluded.
+These numbers evaluate a different target geometry from the original map and
+are not a head-to-head improvement claim.
+
+Retained pairwise correlations are reused exactly. The excluded rows/columns
+are removed before rebuilding each hierarchy; the original all-field hierarchy
+is never pruned and reused as if it were refitted. The policy is recorded in
+saved cluster definitions and exports. Source fields and numerical banks are
+preserved. Older saved color definitions remain distinguishable from current
+heatmap definitions; cluster numbers are not identities across definitions.
+Labels use C1, C2, etc., with feature-group counts rather than a representative
+feature name. Search identifies excluded targets explicitly and still offers
+**This feature** for coloring.
+
+The new map is outcome-excluded, not externally validated: estimates still share
+the original abundance-neighborhood smoothing and reference observations.
+Coloring by an outcome does not establish predictive performance or causality.
+
+## Original pilot and common profile definition
 
 The LSVF pilot contains 1,965 visits from 1,144 participants, with 39 profile
 columns. Twenty-six of the dataset's 1,991 visits lack common finite estimate
@@ -61,10 +98,11 @@ stay fixed when samples are selected.
 The target distance between visits i and j is
 
 \[
-d_{ij}=\sqrt{\sum_{c=1}^{39}(S_{ic}-S_{jc})^2}.
+d_{ij}=\sqrt{\sum_{c=1}^{G}(S_{ic}-S_{jc})^2}.
 \]
 
-Every cluster dimension receives equal weight. Scores remain on their original
+Here G is the number of clusters: 39 in the original pilot, 38 in the
+outcome-excluded map. Every cluster dimension receives equal weight. Scores remain on their original
 0–100 percentile scale: no row normalization, variance standardization,
 whitening or winsorization is applied. Color clipping changes display only.
 
@@ -75,7 +113,7 @@ fits: SGD, 200 internally randomized pivots with regional weights, q = 10 local
 neighbors, 800 epochs, one start, preparation/fitting seeds 20261015, and
 centered unscaled three-component PCA initialization. The Zheng schedule uses
 epsilon 0.1. A PCA projection retaining at least 90% variance selects local
-neighbors; all distance targets use the full 39-column matrix. Exact duplicate
+neighbors; all distance targets use the full profile matrix. Exact duplicate
 rows share fitting coordinates and are restored to their original visits.
 
 For every unordered visit pair with a positive target distance, evaluate
@@ -104,9 +142,10 @@ reproducible sample of pairs when needed. They retain population coordinates.
 
 These are **saved neighborhood-smoothed fields**, estimated using the original
 abundance geometry, not independent raw multiomics measurements. Clinical
-outcomes, including STI, and assay-availability diagnostics participate in this
-all-profile map. Coloring by STI describes a component of the constructed space;
-it cannot establish independent association or predictive performance. Separate
+outcomes, including STI, and assay-availability diagnostics participate in the
+original all-profile map and are excluded from the new map. In the original map,
+STI coloring describes a component of the constructed space. In either map,
+coloring cannot establish independent association or predictive performance. Separate
 visits remain separate points, not independent participants. Participant weighting
 governs percentiles and correlations; the MDS constraints fit distinct vectors
 without participant weights. Profiles may hide opposing feature patterns.

@@ -91,6 +91,31 @@ class EstimateCatalogueTests(unittest.TestCase):
         self.load()
         self.assertEqual(before, self.shards)
 
+    def test_profile_exclusion_policy_is_enforced_without_removing_color_targets(self):
+        self.profile_embedding_fixture()
+        policy = dict(id='outcome-excluded', label='Outcomes excluded',
+                      excluded=[dict(featureId='detection', reason='Outcome')])
+        self.manifest['correlations']['exclusionPolicy'] = policy
+        self.write()
+        self.load()  # Preserved original representation is still admitted.
+        data = json.loads((self.root/'profile.json').read_text())
+        data['snapshot']['exclusionPolicy'] = policy
+        self.manifest['profileEmbeddings'] = [dict(id='joint-test', exclusionPolicyId=policy['id'],
+                    **self.descriptor('profile.json', data))]
+        self.write()
+        with self.assertRaisesRegex(ValueError, 'excluded field'):
+            self.load()
+        data['snapshot']['clusters'][0]['members'] = [0]
+        self.manifest['profileEmbeddings'] = [dict(id='joint-test', exclusionPolicyId=policy['id'],
+                    **self.descriptor('profile.json', data))]
+        self.write()
+        self.load()
+        self.assertEqual(len(self.manifest['features']), 2)
+        policy['excluded'].append(dict(featureId='not-installed', reason='Outcome'))
+        self.write()
+        with self.assertRaisesRegex(ValueError, 'invalid excluded'):
+            self.load()
+
     def test_profile_embedding_identity_mapping_and_definition_are_checked(self):
         changes = [lambda d: d.update(catalogueRevision='another'),
                    lambda d: d.update(recordIndices=[0, 1, 1, 3, 4]),

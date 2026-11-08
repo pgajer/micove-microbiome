@@ -427,8 +427,22 @@ def validate_correlations(folder, manifest, context):
             require(all(math.isfinite(v) for v in values), 'nonfinite correlation inputs')
 
 
+def validate_correlation_exclusions(data):
+    policy = data.get('exclusionPolicy')
+    if policy is None:
+        return
+    require(isinstance(policy, dict) and text(policy.get('id')) and text(policy.get('label')),
+            'invalid correlation exclusion policy')
+    rows = policy.get('excluded', [])
+    ids = {f['featureId'] for f in data['fields']}
+    require(isinstance(rows, list) and rows and all(isinstance(r, dict)
+            and r.get('featureId') in ids and text(r.get('reason')) for r in rows)
+            and len({r['featureId'] for r in rows}) == len(rows), 'invalid excluded features')
+
+
 def validate_profile_embeddings(folder, manifest):
     """Validate optional frozen sample representations against estimate identities."""
+    validate_correlation_exclusions(manifest.get('correlations', {}))
     descriptors = manifest.get('profileEmbeddings', [])
     require(isinstance(descriptors, list), 'profile embeddings must be a list')
     ids = set()
@@ -455,6 +469,13 @@ def validate_profile_embeddings(folder, manifest):
         members = [i for c in clusters for i in c['members']]
         require(all(integer(i) and i < len(fields) for i in members)
                 and len(set(members)) == len(members), 'overlapping or invalid profile features')
+        if descriptor.get('exclusionPolicyId'):
+            policy = manifest['correlations'].get('exclusionPolicy')
+            require(policy and descriptor['exclusionPolicyId'] == policy['id']
+                    and snapshot.get('exclusionPolicy') == policy, 'profile exclusion policy differs')
+            excluded = {r['featureId'] for r in policy['excluded']}
+            require(not any(fields[i]['featureId'] in excluded for i in members),
+                    'excluded field entered profile embedding')
         require(snapshot.get('scope', {}).get('records') == len(records)
                 and data.get('excludedRecords') == manifest['sampleCount'] - len(records)
                 and data.get('weighting') in ('features', 'groups'), 'profile scope or weighting differs')

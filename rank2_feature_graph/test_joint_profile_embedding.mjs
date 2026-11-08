@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const fields=[{label:'Any incident STI',featureId:'sti',categoryId:'clinical'},{label:'IL-1 beta',featureId:'il1',categoryId:'immune'},{label:'STI history',featureId:'history',categoryId:'clinical'}];
-const data={format:'micove-joint-profile-embedding',version:1,id:'test',datasetId:'synthetic',catalogueRevision:'one',sampleOrderSha256:'sha',recordIndices:[0,1,3],coordinates:[[1,2,3],[4,5,6],[7,8,9]],profileScores:[[10,20],[20,30],[30,40]],snapshot:{scope:{participants:2}},excludedRecords:1,sampleCount:4};
+const data={format:'micove-joint-profile-embedding',version:1,id:'test',datasetId:'synthetic',catalogueRevision:'one',sampleOrderSha256:'sha',recordIndices:[0,1,3],coordinates:[[1,2,3],[4,5,6],[7,8,9]],profileScores:[[10,20],[20,30],[30,40]],snapshot:{scope:{participants:2},clusters:[{id:1,members:[0]},{id:2,members:[1]}]},excludedRecords:1,sampleCount:4};
 const asset={datasetId:'synthetic',revision:'one',sampleOrderSha256:'sha',profileEmbeddings:[{id:'test',sha256:'frozen',http:{}}]},storage=new Map(),nodes=new Map();
 const el=id=>{if(!nodes.has(id))nodes.set(id,{textContent:id==='sampleTitle'?'Selected state':'',dataset:{}});return nodes.get(id)};
 let samples=[];
@@ -43,3 +43,15 @@ assert.equal(ctx.jointEmbeddingTransform(source,layout).traces,source);
 assert.equal(JSON.stringify(source),frozen);
 const saved=JSON.parse([...storage.values()][0]);assert.equal(saved.choice,'composition');
 console.log('PASS: joint-profile identity, selection/trajectory mapping, unsupported visits, feature search, persistence and unchanged existing coordinates');
+
+// Independent representations retain their own coordinates, cameras and identity.
+const outcomeExcluded={...structuredClone(data),id:'excluded',coordinates:[[11,12,13],[14,15,16],[17,18,19]],snapshot:{...data.snapshot,exclusionPolicy:{id:'excluded-v1'}}};
+asset.profileEmbeddings.push({id:'excluded',sha256:'new',http:{}});
+ctx.VME_ASSETS.group=async key=>structuredClone(key.endsWith(':new')?outcomeExcluded:data);
+ctx.jointEmbeddingRestore({id:'excluded',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+assert.equal(ctx.jointEmbeddingSnapshot().id,'excluded');assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),outcomeExcluded.coordinates);
+assert.match(ctx.jointEmbeddingInterpretation(ctx.jointEmbeddingModel().data),/excluded.*available for coloring/);
+ctx.jointEmbeddingRestore({id:'test',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),data.coordinates,'Original map remains byte-equivalent after switching');
+assert.equal(ctx.jointEmbeddingSnapshot().id,'test');
+console.log('PASS: multiple frozen representations, saved identity, separate coordinate caches and original map preservation.');

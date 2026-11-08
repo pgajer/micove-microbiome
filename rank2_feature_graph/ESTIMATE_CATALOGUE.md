@@ -156,24 +156,19 @@ Selecting an estimate group in **Color by** automatically opens its heatmaps in
 the catalogue panel. The first is a within-group lower triangle, without the
 trivial diagonal; the remaining panels compare that group with each other group.
 The focus rows share one order. Cluster boundary lines appear on both axes;
-within-group lines stop at the diagonal. Labels use **C3 · [feature name]**,
-with the same numeric ID as the Cluster dropdown. The representative maximizes
-mean signed correlation to the other cluster members in the same feature group
-(equivalently, minimizes mean distance `1 - r`). Numerical ties within `1e-12`
-use frozen feature order. Singletons represent themselves; Unassigned fields
-have no representative. Representatives always belong to the corresponding
-feature group. In Joint mode the same cluster ID can have different names in
-two groups. Keys show the group name when a panel spans groups. The All groups
-view uses a whole-cluster representative for a node spanning several groups;
-individual field labels remain group-specific.
-It is a descriptive label, not evidence of biological importance. Display filters
-never change representatives; changes to samples or calculation settings can.
-Compact axis codes and hover strips share a full-label key above each heatmap. Assay-availability comparisons appear in a
-separately labeled, collapsed diagnostics section. **Focus group** and **Compare
-with** permit manual comparisons. The shared scale is −1 to +1. The panel scrolls
-and retains Maximize. **Edge catalogue** dismisses it until the next change of
-estimate color group; **Correlation heatmap…** can reopen it. Changing to ordinary
-sample colors restores the catalogue.
+within-group lines stop at the diagonal.
+
+Cluster labels use **C1, C2, …**, with feature-group counts beside each
+cluster. Counts use all members before display filters. Labels match the
+Cluster dropdown, heatmap boundaries, graphs and joint-profile controls.
+A cluster is not named after a representative feature. Numbers belong to the
+saved definition and may change after changes to inputs or settings.
+
+Compact axis codes and hover strips share a full-label key above each heatmap.
+**Focus group** and **Compare with** permit manual comparisons. The shared scale
+is −1 to +1. The panel scrolls and retains Maximize. **Edge catalogue** dismisses
+it until the next change of estimate color group; **Correlation heatmap…** can
+reopen it. Changing to ordinary sample colors restores the catalogue.
 
 A heatmap cell or feature-table link colors the existing 3D samples without
 changing selection or coordinates. Cluster and its previous/next buttons stay
@@ -502,7 +497,7 @@ The displayed description records the clustering scope and settings. Color clipp
 at the 2.5th/97.5th percentiles changes only display; profile values remain intact.
 
 The heatmap panel’s **Current color profile** section identifies the saved
-definition as the frozen 39-cluster map, a saved heatmap clustering, or an earlier
+definition as a frozen profile map (original or outcome-excluded), a saved heatmap clustering, or an earlier
 saved definition whose source was not recorded. It states whether membership
 and settings match the current joint heatmap; the same cluster number can refer
 to different members. Saved clustering settings are expandable. The sample
@@ -548,3 +543,23 @@ percentile aggregation, Euclidean targets, pilot settings/results and limitation
 Outcome coloring is descriptive when outcome-related profiles also enter the map.
 Changing color profiles, group weights or heatmap clustering does not refit or
 redefine this frozen representation.
+
+## Correlation exclusion policy and multiple profile maps
+
+An optional `correlations.exclusionPolicy` records an immutable policy `id`,
+reader-facing `label`, and `excluded` entries with `featureId` and `reason`.
+Feature IDs must exist and cannot repeat. It filters fields before rebuilding
+both joint and separate hierarchies, for full-reference and selected-sample
+correlations. Surviving pairwise values, common support and estimate arrays do
+not change. Exclusion reasons are included in the assignments export. Individual
+Color by targets remain installed and searchable.
+
+LSVF v4 excludes 23 disease/health, treatment-use and study-diagnostic fields;
+see [the profile methods](JOINT_PROFILE_EMBEDDING.md) for the complete policy.
+The existing 39-profile map is preserved byte-for-byte alongside the new
+38-profile outcome-excluded map. A new descriptor’s `exclusionPolicyId` must
+match the catalogue policy and its saved snapshot; no excluded feature may
+enter those profiles. Legacy descriptors without this key remain supported.
+Representation selection, cameras and named views retain the specific map ID.
+The clustering policy also separates saved heatmap/profile settings so old
+cluster numbers cannot silently select different memberships.

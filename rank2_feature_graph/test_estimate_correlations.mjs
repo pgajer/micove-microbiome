@@ -15,7 +15,7 @@ const element={value:'original'},model={bySeries:new Map([['a40',{}]]),choices:{
 const selection={state:'existing',ids:[1,2]},coordinates=[[1,2,3],[4,5,6]],before=JSON.stringify({selection,coordinates});let recolors=0;
 const context={console,Map,WeakMap,Set,Number,Math,JSON,Array,estimateAsset:()=>asset,el:()=>element,
  estimateModel:()=>model,syncSampleColorOptions(){},estimateSave(){},recolorSampleView:async()=>{recolors++},selection,coordinates};
-vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('estimate_correlations.js',import.meta.url),'utf8'),context);
+vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('estimate_correlation_clustering.js',import.meta.url),'utf8'),context);vm.runInContext(fs.readFileSync(new URL('estimate_correlations.js',import.meta.url),'utf8'),context);
 context.bank=bank;context.asset=asset;context.data=data;
 const run=s=>vm.runInContext(s,context);
 for(let i=0;i<3;i++)assert.equal(run(`estimateCorrelationValue(bank,${i},${i})`),1);
@@ -89,7 +89,7 @@ console.log('PASS: automatic group opening/switching, lower triangles, aligned r
 // not the first visible field, the largest absolute correlation, or a subset medoid.
 run('representatives=estimateCorrelationRepresentatives(bank,[7,7,7],data)');
 assert.equal(run('representatives.get(7).featureId'),'b');
-assert.equal(run('representatives.get(7).label'),'C7 · [Two]');
+assert.equal(run('representatives.get(7).label'),'C7');
 assert.ok(Math.abs(run('representatives.get(7).meanCorrelation')-.85)<1e-14);
 assert.equal(run('representatives.get(7).categoryId'),'y','Representative need not belong to focus group X');
 run('tieBank={...bank,featureIndices:[2,0],correlations:[-.8]};tieReps=estimateCorrelationRepresentatives(tieBank,[4,4],data)');
@@ -122,8 +122,8 @@ await run('estimateCorrelationDrawPlot(plot,{id:"x--x",rows:[2,0,1],cols:[2,0,1]
 assert.equal(drawn.layout.shapes.length,2);
 assert.deepEqual(Array.from(drawn.traces[0].x),['c','a','b']);
 assert.equal(drawn.traces[0].z[2][0],.8,'Cluster decoration leaves correlations and order unchanged');
-assert.match(drawn.traces[1].text[0],/C1 · \[Three\]/);
-assert.match(drawn.traces[2].text[1],/C2 · \[One/);
+assert.match(drawn.traces[1].text[0],/C1 · Group X: 1/);
+assert.match(drawn.traces[2].text[1],/C2 · Group X: 1/);
 assert.ok(drawn.layout.annotations.some(a=>a.text==='C2'&&a.yref==='y'));
 assert.ok(drawn.layout.annotations.some(a=>a.text==='C2'&&a.xref==='x'));
 console.log('PASS: both axes use matching cluster labels; plot decorations preserve matrix values and feature order.');
@@ -188,7 +188,7 @@ assert.equal(run('estimateCorrelationFieldRepresentative(groupView,0).featureId'
 assert.equal(run('estimateCorrelationFieldRepresentative(groupView,1).featureId'),'b');
 assert.equal(run('estimateCorrelationFieldRepresentative(groupView,2).featureId'),'a','Group search does not rename representative');
 run('groupGraph=estimateCorrelationGraph({rows:[0,2],cols:[1],symmetric:false},groupView)');
-assert.match(run('groupGraph.nodes[0].label'),/One, "quoted"/);assert.match(run('groupGraph.nodes[1].label'),/Two/);
+assert.equal(run('groupGraph.nodes[0].label'),'C7');assert.equal(run('groupGraph.nodes[1].label'),'C7');assert.match(run('groupGraph.nodes[0].composition'),/2/);assert.match(run('groupGraph.nodes[1].composition'),/1/);
 assert.equal(run('groupGraph.nodes[0].cluster===groupGraph.nodes[1].cluster'),true,'Joint ID stays shared while labels become group-specific');
 run('separatePanels=estimateCorrelationPanels(asset,bank,{rows:"x",cols:"all",cluster:"2",clusteringScope:"separate"},[0,1,2],[2,1,2],[0,2])');
 assert.deepEqual(Array.from(run('separatePanels[1].cols')),[1],'Selecting an independent focus cluster keeps comparison-group columns');
@@ -203,8 +203,8 @@ run('groupExportView={...estimateCorrelationShown,...groupView,state:{...estimat
 const groupExports=run('estimateCorrelationFiles(groupExportView)');
 assert.equal(groupExports.filter(f=>f.name.startsWith('clusterings/')).length,4);
 assert(!groupExports.some(f=>f.name==='clustering_tree.csv'));
-assert.match(groupExports.find(f=>f.name==='cluster_representatives.csv').text, /"7","x","C7 · \[One/);
-assert.match(groupExports.find(f=>f.name==='cluster_representatives.csv').text, /"7","y","C7 · \[Two/);
+assert.match(groupExports.find(f=>f.name==='cluster_representatives.csv').text, /"7","x","C7"/);
+assert.match(groupExports.find(f=>f.name==='cluster_representatives.csv').text, /"7","y","C7"/);
 assert.equal(JSON.parse(groupExports.find(f=>f.name==='settings.json').text).clustering.scope,'separate');
 assert.equal(JSON.stringify({selection,coordinates}),before);
 console.log('PASS: group-specific representatives in joint mode, comparison columns, separate default/migration, explicit joint persistence, per-group tree exports, and preserved selections/embeddings.');

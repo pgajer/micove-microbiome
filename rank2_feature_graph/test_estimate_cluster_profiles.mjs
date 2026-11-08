@@ -12,7 +12,7 @@ const context={console,atob,Uint8Array,Float64Array,DataView,Map,WeakMap,Set,Mat
  META:{id:'test'},BUNDLE_PACK:{estimateCatalogues:{test:asset},participants:{test:{records}}},DATA:{records},sampleColorMode:()=>el('sampleColorScheme').value,
  localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},participant:{sampleColors:true},participantData:()=>({records}),datasetRegistry:new Map([['test',{data:{samples:{pair:['a','b','c','d']}}}]]),renderCountedSampleLegend(){},
  Plotly:{restyle:async(p,updates,indices)=>{for(const i of indices)for(const [key,v]of Object.entries(updates))if(key.startsWith('marker.'))p.data[i].marker[key.slice(7)]=v[0];else p.data[i][key]=key==='hovertext'?v[0]:v}}};
-vm.createContext(context);for(const f of ['valencia2.js','estimate_colors.js','estimate_correlations.js','estimate_cluster_profiles.js'])vm.runInContext(fs.readFileSync(new URL(f,import.meta.url),'utf8'),context);
+vm.createContext(context);for(const f of ['valencia2.js','estimate_colors.js','estimate_correlation_clustering.js','estimate_correlations.js','estimate_cluster_profiles.js'])vm.runInContext(fs.readFileSync(new URL(f,import.meta.url),'utf8'),context);
 const run=s=>vm.runInContext(s,context),plain=v=>JSON.parse(JSON.stringify(v));
 assert.deepEqual(plain(run('jointProfileScores(input,[0],4).values')),[12.5,37.5,75,null]);
 assert.deepEqual(plain(run('jointProfileScores(input,[2],4).values')),[25,25,75,null]);
@@ -84,7 +84,7 @@ assert.match(run('jointProfileHeatmapRelation(snapshot,view)'),/differs.*same cl
 view.state.clusteringScope='separate';
 assert.match(run('jointProfileHeatmapRelation(snapshot,view)'),/separately.*unchanged/);
 assert.match(run('jointProfileHeatmapRelation(snapshot,null)'),/being prepared/);
-assert.equal(run('jointProfileDefinitionLabel({...snapshot,source:{kind:"embedding",id:"frozen"}})'),'Frozen 39-cluster map');
+assert.equal(run('jointProfileDefinitionLabel({...snapshot,source:{kind:"embedding",id:"frozen"}})'),'Frozen 1-cluster map · Original, outcomes included');
 assert.equal(run('jointProfileDefinitionLabel({...snapshot,source:undefined})'),'Saved joint clustering (earlier session)');
 view.state.clusteringScope='joint';view.labels=[1,1,0];
 const beforeAction=JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.meta]),camera:plot.layout.scene});

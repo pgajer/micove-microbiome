@@ -66,3 +66,19 @@ assert.deepEqual(Array.from(groupCluster(changed,groupSettings).labels),Array.fr
 const tiny=groupCluster(small,{...settings,clustering:'dynamic'});assert(tiny.labels.every(c=>c===0),'Small groups stay visible but unassigned');
 assert.deepEqual(Array.from(groupCluster(bank,{clusteringScope:'joint',clustering:'dynamic',minSize:5,deepSplit:1}).labels),Array.from(fit.labels),'Joint mode preserves the existing fit');
 console.log('PASS: independent group hierarchies, rebuilt complete linkage, unique cluster IDs, tiny groups, between-group invariance, unchanged banks, and preserved joint fits.');
+
+// An exclusion policy removes fields before either hierarchy is built, while
+// preserving retained correlation values and their immutable feature indices.
+const policyData={fields:[{featureId:'a',categoryId:'bio'},{featureId:'outcome',categoryId:'clinical'},{featureId:'c',categoryId:'bio'},{featureId:'constant',categoryId:'diagnostic'}],exclusionPolicy:{id:'excluded-v1',excluded:[{featureId:'outcome',reason:'Outcome'},{featureId:'constant',reason:'Diagnostic'}]}};
+const policyBank={featureIndices:[0,1,2],correlations:[.9,.2,.8],linkage:[[0,1,.1,2],[2,3,.8,3]],order:[0,1,2],excluded:[{featureIndex:3,reason:'Constant'}],records:9,participants:5};
+const untouched=JSON.stringify(policyBank),filtered=context.estimateCorrelationAnalysisBank(policyBank,policyData);
+assert.equal(JSON.stringify(policyBank),untouched);
+assert.deepEqual(Array.from(filtered.featureIndices),[0,2]);assert.deepEqual(Array.from(filtered.correlations),[.2]);
+assert.equal(filtered.linkage,undefined,'Old full hierarchy cannot survive exclusion');
+assert.deepEqual(Array.from(filtered.excluded,x=>x.featureIndex).sort(),[1,3]);
+assert.equal(context.estimateCorrelationAnalysisBank(policyBank,policyData),filtered,'Repeated display uses same policy cache');
+assert.notEqual(context.estimateCorrelationAnalysisBank(policyBank,{...policyData,exclusionPolicy:{id:'other',excluded:[{featureId:'a',reason:'different'}]}}),filtered);
+const afterCut=cluster(filtered,{clustering:'threshold',threshold:.7,minSize:2,deepSplit:1});assert.notEqual(afterCut.labels[0],afterCut.labels[1]);
+assert.equal(policyData.fields.length,4,'Excluded targets remain available for coloring');
+assert.equal(context.estimateClusterGroupCounts([0,2],policyData.fields,[{id:'bio',label:'Biological fields'}]),'Biological fields: 2');
+console.log('PASS: pre-clustering policy exclusions, unchanged retained pairs and estimates, hierarchy invalidation, constant reasons and composition labels.');

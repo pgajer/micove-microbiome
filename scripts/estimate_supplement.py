@@ -46,6 +46,12 @@ REVIEWED['7e27bc891b10f3b041b35495c3ca0f692592cd9782454f08f2234acef984044e'] = {
 }
 
 
+# Outcome exclusions and additive 38-profile map; original arrays preserved.
+REVIEWED['fa6a6bcb0a73a8dce1de4f4eea654594e9447dbf761329b2e3964b40c09c98dc'] = {
+    **REVIEWED['7e27bc891b10f3b041b35495c3ca0f692592cd9782454f08f2234acef984044e'],
+}
+
+
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
     if isinstance(value, dict):

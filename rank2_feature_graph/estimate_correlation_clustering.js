@@ -113,3 +113,24 @@ function clusterEstimateCorrelationGroups(bank,settings){
  }
  return {labels,order,linkage:[],groups,scope:'separate',method:settings.clustering,implementation:'micove-groupwise-correlation-clustering-v1'};
 }
+
+// Subset the packed matrix before constructing a new hierarchy. Original field
+// indices and saved estimates remain intact, including fields kept for coloring.
+const estimateCorrelationPolicyCache=new WeakMap();
+function estimateCorrelationAnalysisBank(bank,data){
+ const policy=data.exclusionPolicy;if(!policy?.excluded?.length||bank.issue)return bank;
+ const key=JSON.stringify(policy),cached=estimateCorrelationPolicyCache.get(bank);if(cached?.key===key)return cached.bank;
+ const excluded=new Map(policy.excluded.map(f=>[f.featureId,f.reason]));
+ const keep=bank.featureIndices.map((f,i)=>i).filter(i=>!excluded.has(data.fields[bank.featureIndices[i]].featureId)),n=bank.featureIndices.length,correlations=[];
+ for(let a=0;a<keep.length;a++)for(let b=a+1;b<keep.length;b++){const i=keep[a],j=keep[b];correlations.push(bank.correlations[i*n-i*(i+1)/2+j-i-1])}
+ const omissions=(bank.excluded||[]).filter(f=>!excluded.has(data.fields[f.index??f.featureIndex]?.featureId));
+ for(const [index,field] of data.fields.entries())if(excluded.has(field.featureId))omissions.push({featureIndex:index,reason:excluded.get(field.featureId)});
+ const result={...bank,featureIndices:keep.map(i=>bank.featureIndices[i]),correlations,excluded:omissions,exclusionPolicy:policy};
+ delete result.linkage;delete result.order;
+ estimateCorrelationPolicyCache.set(bank,{key,bank:result});return result;
+}
+function estimateClusterGroupCounts(members,fields,categories=[]){
+ const counts=new Map();for(const i of members){const id=fields[i].categoryId;counts.set(id,(counts.get(id)||0)+1)}
+ const order=[...categories.map(g=>g.id),...counts.keys()].filter((id,i,a)=>a.indexOf(id)===i);
+ return order.filter(id=>counts.has(id)).map(id=>(categories.find(g=>g.id===id)?.label||id)+': '+counts.get(id)).join(' · ');
+}

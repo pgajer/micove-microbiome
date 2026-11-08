@@ -1,7 +1,7 @@
 // Descriptive summaries of saved fields. Never refit an estimate or embedding.
 const jointProfileInputs=new WeakMap();
 function jointProfileActive(){return !!estimateAsset()?.correlations&&sampleColorMode()==='joint-clusters'}
-function jointProfileKey(asset){return 'micove-joint-profiles:'+asset.datasetId+'@'+asset.revision+':'+asset.correlations.revision}
+function jointProfileKey(asset){return 'micove-joint-profiles:'+asset.datasetId+'@'+asset.revision+':'+asset.correlations.revision+(asset.correlations.exclusionPolicy?':'+asset.correlations.exclusionPolicy.id:'')}
 function jointProfileModel(){
  const m=estimateModel();if(!m?.asset.correlations)return null;if(m.jointProfiles)return m.jointProfiles;
  let saved;try{saved=JSON.parse(localStorage.getItem(jointProfileKey(m.asset)))}catch{}
@@ -14,15 +14,15 @@ function jointProfileDefinition(){const m=jointProfileModel();return m?.snapshot
 function jointProfileSeries(){
  const m=jointProfileModel(),c=jointProfileDefinition();
  if(m?.seriesSnapshot===m?.snapshot&&m?.seriesCluster===c?.id&&m?.series?.weighting===m?.weighting)return m.series;
- const series={id:'joint:'+JSON.stringify([m?.snapshot?.key,c?.id,m?.weighting]),joint:true,weighting:m?.weighting,quantityLabel:m?.weighting==='groups'?'Group-balanced median percentile':'Median feature percentile',unit:'percentile points',valueDomain:'real',label:c?.label||'Joint cluster',k:m?.snapshot?.settings.k};
+ const series={id:'joint:'+JSON.stringify([m?.snapshot?.key,c?.id,m?.weighting]),joint:true,weighting:m?.weighting,quantityLabel:m?.weighting==='groups'?'Group-balanced median percentile':'Median feature percentile',unit:'percentile points',valueDomain:'real',label:c?'C'+c.id:'Joint cluster',k:m?.snapshot?.settings.k};
  if(m){m.series=series;m.seriesSnapshot=m.snapshot;m.seriesCluster=c?.id}return series;
 }
 function jointProfileSnapshot(view){
  const groups=new Map();view.labels.forEach((id,i)=>{if(id>0){if(!groups.has(id))groups.set(id,[]);groups.get(id).push(view.bank.featureIndices[i])}});
  const settings=Object.fromEntries(['k','unit','method','clustering','minSize','deepSplit','threshold'].map(k=>[k,view.state[k]]));
- const clusters=[...groups].sort((a,b)=>a[0]-b[0]).map(([id,members])=>({id,members,label:view.representatives.get(id).label}));
+ const clusters=[...groups].sort((a,b)=>a[0]-b[0]).map(([id,members])=>({id,members,label:'C'+id}));
  const scope={label:view.scope.label,key:view.scope.key,records:view.bank.records,participants:view.bank.participants};
- return {version:1,source:{kind:'heatmap'},settings,scope,clusters,key:JSON.stringify([view.asset.correlations.revision,settings,scope.key,clusters])};
+ return {version:1,source:{kind:'heatmap'},...(view.asset.correlations.exclusionPolicy?{exclusionPolicy:view.asset.correlations.exclusionPolicy}:{}),settings,scope,clusters,key:JSON.stringify([view.asset.correlations.revision,settings,scope.key,clusters])};
 }
 async function jointProfileInput(asset,k){
  let cache=jointProfileInputs.get(asset);if(!cache){cache=new Map();jointProfileInputs.set(asset,cache)}if(cache.has(k))return cache.get(k);
@@ -84,6 +84,7 @@ async function jointProfilePrepare(){
  if(!bank||asset!==estimateAsset())return null;
  if(bank.catalogueRevision!==asset.revision||bank.sampleOrderSha256!==asset.sampleOrderSha256||bank.datasetId!==asset.datasetId)throw Error('Joint-cluster bank identity differs.');
  if(bank.issue)throw Error(bank.issue);
+ bank=estimateCorrelationAnalysisBank(bank,data);
  const clustering=await estimateCorrelationCluster(bank,s);if(!clustering||asset!==estimateAsset())return null;
  return jointProfileSnapshot({asset,bank,labels:clustering.labels,representatives:estimateCorrelationRepresentatives(bank,clustering.labels,data),state:s,scope});
 }
@@ -105,17 +106,17 @@ async function jointProfileEnsure(request){
  }catch(error){if(request!==estimateRequest)return false;el('jointProfileStatus').textContent='Cluster profile unavailable: '+error.message;console.error(error);return true}
 }
 function jointProfileDisplay(c){return {mode:'joint_percentile',reference:null,convert:v=>Number.isFinite(v)?v:null,format:v=>v==null?'Unavailable':Number(v.toFixed(2))+'',limits:estimateLimitsCached(c),title:c.series.weighting==='groups'?'Median percentile · equal groups':'Median feature percentile',unit:'percentile points (0–100)'}}
-function jointProfileGroupCounts(cluster){const asset=estimateAsset(),fields=asset.correlations.fields;return asset.categories.map(g=>({label:g.label,n:cluster.members.filter(i=>fields[i].categoryId===g.id).length})).filter(g=>g.n).map(g=>g.label+': '+g.n).join(' · ')}
+function jointProfileGroupCounts(cluster){const asset=estimateAsset();return estimateClusterGroupCounts(cluster.members,asset.correlations.fields,asset.categories)}
 function jointProfileDefinitionLabel(snapshot){
  if(!snapshot)return 'No cluster chosen';
  const frozen=typeof jointEmbeddingModel==='function'?jointEmbeddingModel()?.data:null;
- if(snapshot.source?.kind==='embedding'||frozen?.snapshot.key===snapshot.key)return 'Frozen 39-cluster map';
- return snapshot.source?.kind==='heatmap'?'Saved heatmap clustering':'Saved joint clustering (earlier session)';
+ if(snapshot.source?.kind==='embedding'||frozen?.snapshot.key===snapshot.key)return 'Frozen '+snapshot.clusters.length+'-cluster map'+(snapshot.exclusionPolicy?' · Outcomes excluded':' · Original, outcomes included');
+ return snapshot.source?.kind==='heatmap'?'Saved heatmap clustering'+(snapshot.exclusionPolicy?' · Outcomes excluded':''):'Saved joint clustering (earlier session)';
 }
 function jointProfileComparableDefinition(snapshot){
  if(!snapshot)return null;const s=snapshot.settings;
  // Display labels and source metadata are not part of cluster membership.
- return JSON.stringify([s.k,s.unit,s.method,s.clustering,s.clustering==='dynamic'?[s.minSize,s.deepSplit]:s.threshold,
+ return JSON.stringify([snapshot.exclusionPolicy?.id||null,s.k,s.unit,s.method,s.clustering,s.clustering==='dynamic'?[s.minSize,s.deepSplit]:s.threshold,
   snapshot.scope.key,snapshot.scope.records,snapshot.scope.participants,
   snapshot.clusters.map(c=>[c.id,[...c.members].sort((a,b)=>a-b)]).sort((a,b)=>a[0]-b[0])]);
 }
@@ -135,12 +136,12 @@ function jointProfileHeatmapSync(){
  el('jointProfileExport').disabled=!jointProfileExportReady();
  el('jointProfileExportStatus').textContent='';
 }
-function jointProfileDescription(){const m=jointProfileModel(),c=jointProfileDefinition();if(!c)return 'Choose Jointly in the heatmap, then use a cluster’s Color 3D samples action.';const s=m.snapshot.settings;return c.label+' · '+c.members.length+' features · '+jointProfileGroupCounts(c)+'. '+jointProfileWeightingLabel(m.weighting)+'. Membership: '+m.snapshot.scope.label+'; '+m.snapshot.scope.records+' visits, '+m.snapshot.scope.participants+' participants; K = '+s.k+'; '+s.method+'; '+(s.unit==='participants'?'participant means':'participant-weighted visits')+'; '+(s.clustering==='dynamic'?'Dynamic Tree Cut, minimum '+s.minSize+', sensitivity '+s.deepSplit:'minimum correlation '+s.threshold)+'. Definition saved until you choose a cluster from another definition. Percentiles always use the full common-support reference; each visit retains its own profile.'}
+function jointProfileDescription(){const m=jointProfileModel(),c=jointProfileDefinition();if(!c)return 'Choose Jointly in the heatmap, then use a cluster’s Color 3D samples action.';const s=m.snapshot.settings;return 'C'+c.id+' · '+c.members.length+' features · '+jointProfileGroupCounts(c)+'. '+jointProfileWeightingLabel(m.weighting)+'. Membership: '+m.snapshot.scope.label+'; '+m.snapshot.scope.records+' visits, '+m.snapshot.scope.participants+' participants; K = '+s.k+'; '+s.method+'; '+(s.unit==='participants'?'participant means':'participant-weighted visits')+'; '+(s.clustering==='dynamic'?'Dynamic Tree Cut, minimum '+s.minSize+', sensitivity '+s.deepSplit:'minimum correlation '+s.threshold)+'. Definition saved until you choose a cluster from another definition. Percentiles always use the full common-support reference; each visit retains its own profile.'}
 function jointProfileInstall(){
  if(el('jointProfileControls'))return;const box=document.createElement('details');box.id='jointProfileControls';box.open=true;box.hidden=true;
  box.innerHTML='<summary>Joint cluster profile</summary><label for="jointProfileCluster">Cluster target</label><div class="participantPicker"><button type="button" id="jointProfilePrevious" aria-label="Previous joint cluster">‹</button><select id="jointProfileCluster" aria-label="Joint cluster target"></select><button type="button" id="jointProfileNext" aria-label="Next joint cluster">›</button></div><label title="Off: every feature has equal weight. On: every group present in this cluster has equal total weight, divided equally among its features. The profile is their weighted median percentile; membership and percentile references stay fixed."><input id="jointProfileEqualGroups" type="checkbox"> Weight feature groups equally</label><p id="jointProfileDefinitionLabel"></p><p id="jointProfileDescription"></p><label><input id="jointProfileClip" type="checkbox" checked> Limit colors to central 95%</label><p id="jointProfileStatus" role="status"></p><p>Choose a new definition with <b>Color 3D samples</b> beside a cluster in the heatmap panel. Profile documentation and downloads are there too.</p>';
  el('sampleColoringControls').appendChild(box);
- const style=document.createElement('style');style.textContent='#jointProfileControls[hidden],#jointClusterCatalogue[hidden]{display:none!important}#jointProfileControls{padding:8px 10px;border-bottom:1px solid #ccdce3;font-size:12px;line-height:1.5}#jointProfileControls select{width:100%;min-width:0}#jointProfileControls button{font-size:12px;margin:3px 0;padding:4px}#jointClusterCatalogue{border:1px solid #ccdce3;padding:8px;margin-top:10px;font-size:12px}#jointClusterCatalogue table{width:100%;border-collapse:collapse}#jointClusterCatalogue th,#jointClusterCatalogue td{padding:5px;text-align:left;border-bottom:1px solid #dae2e5}#jointClusterCatalogue .jointMembers{overflow:auto;max-height:330px}#jointClusterCatalogue summary{cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px}#jointClusterCatalogue summary button{flex-shrink:0}#jointProfileSummary[hidden]{display:none!important}#jointProfileSummary{border:1px solid #ccdce3;border-radius:5px;padding:8px;margin:10px 0}#jointProfileSummary h3{font-size:14px;margin:0 0 5px}#jointProfileSummary button{margin:3px 5px 3px 0}';document.head.appendChild(style);
+ const style=document.createElement('style');style.textContent='#jointProfileControls[hidden],#jointClusterCatalogue[hidden]{display:none!important}#jointProfileControls{padding:8px 10px;border-bottom:1px solid #ccdce3;font-size:12px;line-height:1.5}#jointProfileControls select{width:100%;min-width:0}#jointProfileControls button{font-size:12px;margin:3px 0;padding:4px}#jointClusterCatalogue{border:1px solid #ccdce3;padding:8px;margin-top:10px;font-size:12px}#jointClusterCatalogue table{width:100%;border-collapse:collapse}#jointClusterCatalogue th,#jointClusterCatalogue td{padding:5px;text-align:left;border-bottom:1px solid #dae2e5}#jointClusterCatalogue .jointMembers{overflow:auto;max-height:330px}#jointClusterCatalogue summary{cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px}#jointClusterCatalogue summary>span:before{content:"▸ "}#jointClusterCatalogue details[open]>summary>span:before{content:"▾ "}#jointClusterCatalogue summary button{flex-shrink:0}#jointProfileSummary[hidden]{display:none!important}#jointProfileSummary{border:1px solid #ccdce3;border-radius:5px;padding:8px;margin:10px 0}#jointProfileSummary h3{font-size:14px;margin:0 0 5px}#jointProfileSummary button{margin:3px 5px 3px 0}';document.head.appendChild(style);
  el('jointProfileCluster').onchange=()=>jointProfileChoose(Number(el('jointProfileCluster').value)).catch(estimateCorrelationError);
  for(const [id,direction] of [['Previous',-1],['Next',1]])el('jointProfile'+id).onclick=()=>{const s=el('jointProfileCluster'),o=s.options[s.selectedIndex+direction];if(o){s.value=o.value;s.onchange()}};
  el('jointProfileEqualGroups').onchange=()=>{jointProfileModel().weighting=el('jointProfileEqualGroups').checked?'groups':'features';jointProfileSave();recolorSampleView().catch(e=>{el('jointProfileStatus').textContent=e.message})};
@@ -148,7 +149,7 @@ function jointProfileInstall(){
 }
 function jointProfileSync(){
  if(!estimateAsset()?.correlations&&!el('jointProfileControls'))return;jointProfileInstall();const box=el('jointProfileControls');box.hidden=!jointProfileActive();jointProfileHeatmapSync();if(box.hidden)return;
- const m=jointProfileModel(),select=el('jointProfileCluster');select.replaceChildren(...(m.snapshot?.clusters||[]).map(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.label+' · '+c.members.length+' features';return o}));select.value=m.chosen;select.disabled=!select.options.length;
+ const m=jointProfileModel(),select=el('jointProfileCluster');select.replaceChildren(...(m.snapshot?.clusters||[]).map(c=>{const o=document.createElement('option');o.value=c.id;o.textContent='C'+c.id+' · '+jointProfileGroupCounts(c);return o}));select.value=m.chosen;select.disabled=!select.options.length;
  el('jointProfilePrevious').disabled=select.selectedIndex<=0;el('jointProfileNext').disabled=select.selectedIndex<0||select.selectedIndex>=select.options.length-1;
  el('jointProfileDescription').textContent=jointProfileDescription();el('jointProfileEqualGroups').checked=m.weighting==='groups';el('jointProfileClip').checked=estimateModel().clip;el('jointProfileDefinitionLabel').textContent='Saved definition: '+jointProfileDefinitionLabel(m.snapshot)+'.';
 }
@@ -156,13 +157,13 @@ function jointProfileCatalogue(view){
  let box=el('jointClusterCatalogue');if(!box){box=document.createElement('section');box.id='jointClusterCatalogue';el('estimateCorrelationGallery').before(box)}
  box.hidden=view.state.clusteringScope!=='joint';if(box.hidden)return;
  const snapshot=jointProfileSnapshot(view),asset=view.asset,fields=view.data.fields;
- box.innerHTML='<h3>Joint cluster catalogue</h3><p>All joint clusters in this analysis, independent of heatmap display filters. Open a cluster for its members, grouped by feature type. Color 3D samples saves that cluster definition and uses your current profile weighting. In the sample sidebar, choose equal feature weights (default) or equal total weight per feature group.</p>'+snapshot.clusters.map(c=>'<details><summary><span>'+esc(c.label)+' · '+c.members.length+' features</span><button type="button" data-joint-cluster="'+c.id+'" aria-label="Color 3D samples by C'+c.id+'">Color 3D samples</button></summary><p>'+esc(jointProfileGroupCounts(c))+'</p><div class="jointMembers"><table><thead><tr><th>Feature type</th><th>Feature / individual target</th><th>Transformation</th></tr></thead><tbody>'+asset.categories.flatMap(g=>c.members.filter(i=>fields[i].categoryId===g.id).sort((a,b)=>fields[a].label.localeCompare(fields[b].label)||a-b).map(i=>'<tr><td>'+esc(g.label)+'</td><td><button type="button" data-correlation-feature="'+i+'">'+esc(fields[i].label)+'</button></td><td>'+esc(fields[i].transformationLabel)+'</td></tr>')).join('')+'</tbody></table></div></details>').join('')+'<p>'+view.labels.filter(id=>!id).length+' unassigned features are not a cluster and have no combined profile. Constant fields are excluded. Assay-availability members, when present, describe measurement availability. Equal-feature weighting lets large groups contribute more; equal-group weighting divides the same total weight among each group’s members.</p>';
+ box.innerHTML='<h3>Joint cluster catalogue</h3><p>All joint clusters in this analysis, independent of heatmap display filters. Open a cluster for its members, grouped by feature type. Color 3D samples saves that cluster definition and uses your current profile weighting. In the sample sidebar, choose equal feature weights (default) or equal total weight per feature group.</p>'+snapshot.clusters.map(c=>'<details><summary><span>'+'C'+c.id+' · '+esc(jointProfileGroupCounts(c))+'</span><button type="button" data-joint-cluster="'+c.id+'" aria-label="Color 3D samples by C'+c.id+'">Color 3D samples</button></summary><p>'+esc(jointProfileGroupCounts(c))+'</p><div class="jointMembers"><table><thead><tr><th>Feature type</th><th>Feature / individual target</th><th>Transformation</th></tr></thead><tbody>'+asset.categories.flatMap(g=>c.members.filter(i=>fields[i].categoryId===g.id).sort((a,b)=>fields[a].label.localeCompare(fields[b].label)||a-b).map(i=>'<tr><td>'+esc(g.label)+'</td><td><button type="button" data-correlation-feature="'+i+'">'+esc(fields[i].label)+'</button></td><td>'+esc(fields[i].transformationLabel)+'</td></tr>')).join('')+'</tbody></table></div></details>').join('')+'<p>'+view.labels.filter(id=>!id).length+' unassigned features are not a cluster and have no combined profile. Constant fields are excluded. Assay-availability members, when present, describe measurement availability. Equal-feature weighting lets large groups contribute more; equal-group weighting divides the same total weight among each group’s members.</p>';
  box.onclick=e=>{const c=e.target.closest?.('[data-joint-cluster]'),f=e.target.closest?.('[data-correlation-feature]');if(c){e.preventDefault();jointProfileChoose(Number(c.dataset.jointCluster),view).catch(estimateCorrelationError)}else if(f)estimateCorrelationSelect(Number(f.dataset.correlationFeature)).catch(estimateCorrelationError)};
 }
 function jointProfileLegend(entries){
  const c=estimateCurrent(),d=c&&jointProfileDisplay(c),definition=jointProfileDefinition(),seen=new Set(),supported=new Set();
  for(const e of entries){seen.add(e.key);if(c&&Number.isFinite(c.row.values[estimateIndex(e.index,e.record,e.profile)]))supported.add(e.key)}
- let html='<div class="estimateLegend"><strong>'+esc(definition?.label||'Joint cluster profile')+'</strong><p>'+esc(jointProfileWeightingLabel(jointProfileModel().weighting))+' · median feature percentile · unitless summary of saved estimates, not an outcome probability.</p>';
+ let html='<div class="estimateLegend"><strong>'+esc(definition?'C'+definition.id+' · '+jointProfileGroupCounts(definition):'Joint cluster profile')+'</strong><p>'+esc(jointProfileWeightingLabel(jointProfileModel().weighting))+' · median feature percentile · unitless summary of saved estimates, not an outcome probability.</p>';
  if(d?.limits)html+='<div class="estimateRamp" style="background:linear-gradient(to right,'+estimateViridis.join(',')+')"></div><div class="estimateEnds"><span>'+esc(d.format(d.limits[0]))+'</span><span>'+esc(d.format(d.limits[1]))+'</span></div><p>'+(estimateModel().clip?'Colors clipped at the 2.5th and 97.5th percentiles.':'Full profile range.')+' Hover values are unchanged. Color limits stay fixed across sample selections.</p>';
  html+='<p>'+esc(jointProfileDescription())+'</p><p>'+supported.size+' of '+seen.size+' displayed records have a profile. Gray: no common estimate support. Reference markers excluded.</p>'+(c?'<p>Percentile reference: '+c.row.referenceRecords+' visits from '+c.row.referenceParticipants+' equally weighted participants.</p>':'')+'</div>';
  el('sampleLegend').hidden=false;el('sampleLegendItems').innerHTML=html;return true;
