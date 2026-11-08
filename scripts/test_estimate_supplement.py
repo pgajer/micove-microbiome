@@ -1,4 +1,5 @@
 """Packaging boundary checks using synthetic catalogue and dataset identities."""
+import base64
 import copy
 import json
 from pathlib import Path
@@ -50,6 +51,33 @@ class EstimatePackagingTests(unittest.TestCase):
         self.assertEqual(index['releaseStage'], 'pilot')
         attach(self.page, self.folder)
         self.assertEqual(p.read_manifest(self.page), manifest)
+
+    def report_fixture(self, raw):
+        (self.folder / 'report.pdf').write_bytes(raw)
+        self.fixture.manifest['documentation'] = [dict(id='report', label='Report PDF',
+            file='report.pdf', sha256=p.sha(raw), bytes=len(raw))]
+        self.fixture.write()
+        digest = p.sha((self.folder / 'manifest.json').read_bytes())
+        receipt = self.folder / 'validation.json'
+        data = json.loads(receipt.read_text()); data['manifestSha256'] = digest
+        receipt.write_text(json.dumps(data))
+        return patch.dict('estimate_supplement.REVIEWED', {digest: {**self.fixture.expected, 'releaseStage': 'full'}})
+
+    def test_pdf_report_preserves_binary_bytes(self):
+        raw = b'%PDF-1.4\n%\x80\xff binary fixture\n%%EOF'
+        with self.report_fixture(raw):
+            attach(self.page, self.folder)
+        descriptor = p.read_manifest(self.page)['datasets']['synthetic']['estimateAssets']['documents']['report']
+        document = json.loads(p.checked_bytes(self.web, descriptor))
+        self.assertEqual(document['mimeType'], 'application/pdf')
+        self.assertEqual(base64.b64decode(document['base64']), raw)
+
+    def test_invalid_pdf_cannot_replace_page(self):
+        before = self.page.read_bytes()
+        with self.report_fixture(b'not a PDF'):
+            with self.assertRaisesRegex(ValueError, 'PDF signature'):
+                attach(self.page, self.folder)
+        self.assertEqual(self.page.read_bytes(), before)
 
     def test_uninstalled_dataset_is_unchanged(self):
         self.manifest['datasets'] = {}; self.write()

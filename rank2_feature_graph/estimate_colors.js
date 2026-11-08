@@ -10,17 +10,19 @@ function estimateModel(asset=estimateAsset()){
  for(const r of records){recordIndices.set(r.index,ids.get(r.id));const list=profiles.get(r.profile)||[];list.push(ids.get(r.id));profiles.set(r.profile,list)}
  const features=new Map(asset.features.map(f=>[f.id,f])),policies=new Map((asset.estimationPolicies||[]).map(p=>[p.id,p]));
  const series=asset.series.map(s=>{const item={...asset.seriesDefaults,...s};return {...item,estimation:item.estimation||policies.get(item.estimationId)}});
+ const byCategory=new Map(),bySeries=new Map();
+ for(const item of series){const category=features.get(item.featureId).categoryId;if(!byCategory.has(category))byCategory.set(category,[]);byCategory.get(category).push(item);bySeries.set(item.id,item)}
  const storageKey='micove-estimate-colors:'+asset.datasetId+'@'+asset.revision;
  let saved;try{saved=JSON.parse(localStorage.getItem(storageKey))}catch{}
- const model={asset,ids,profiles,recordIndices,features,series,storageKey,choices:{},clip:saved?.clip!==false,rows:new Map()};
+ const model={asset,ids,profiles,recordIndices,features,series,byCategory,bySeries,storageKey,choices:{},clip:saved?.clip!==false,rows:new Map()};
  for(const [category,id] of Object.entries(saved?.choices||{}))if(series.some(s=>s.id===id&&features.get(s.featureId)?.categoryId===category))model.choices[category]=id;
  estimateModels.set(asset,model);return model;
 }
 function estimateSave(){const m=estimateModel();if(m)try{localStorage.setItem(m.storageKey,JSON.stringify({choices:m.choices,clip:m.clip}))}catch{}}
 function estimateSelection(){
  if(!estimateActive())return null;
- const m=estimateModel(),category=sampleColorMode().slice(9),rows=m.series.filter(s=>m.features.get(s.featureId)?.categoryId===category);
- return rows.find(s=>s.id===m.choices[category])||rows[0]||null;
+ const m=estimateModel(),category=sampleColorMode().slice(9),rows=m.byCategory.get(category)||[];
+ return m.bySeries.get(m.choices[category])||rows[0]||null;
 }
 function estimateQuantile(sorted,p){const at=(sorted.length-1)*p,low=Math.floor(at);return sorted[low]+(sorted[Math.min(low+1,sorted.length-1)]-sorted[low])*(at-low)}
 function estimateLimits(values,clip=true){const v=values.filter(Number.isFinite).sort((a,b)=>a-b);return v.length?[estimateQuantile(v,clip ? .025 : 0),estimateQuantile(v,clip ? .975 : 1)]:null}
@@ -39,7 +41,7 @@ function estimateIndex(index,record=null,profile=null){
 }
 function estimateCurrent(){const s=estimateSelection();return s&&estimateLoaded?.asset===estimateAsset()&&estimateLoaded.series.id===s.id?estimateLoaded:null}
 function estimatePointColor(index,record=null,profile=null){const c=estimateCurrent();return c?estimateColor(c.row.values[estimateIndex(index,record,profile)],estimateLimitsCached(c)):estimateNeutral}
-function estimateLimitsCached(c){const clip=estimateModel().clip;if(c.clip!==clip||!c.limits){c.clip=clip;c.limits=estimateLimits(c.row.values,clip)}return c.limits}
+function estimateLimitsCached(c){const clip=estimateModel().clip;if(c.clip!==clip||c.limits===undefined){c.clip=clip;c.limits=estimateLimits(c.row.values,clip)}return c.limits}
 function estimateSyncOptions(){
  const select=el('sampleColorScheme'),asset=estimateAsset(),expected=new Set((asset?.categories||[]).map(c=>'estimate:'+c.id));
  for(const option of Array.from(select.options))if(option.value.startsWith('estimate:')&&!expected.has(option.value))option.remove();
@@ -52,12 +54,12 @@ function estimateInstall(){
  if(el('estimateControls'))return;
  const style=document.createElement('style');style.textContent=`#estimateControls[hidden],#estimateControls label[hidden]{display:none}#estimateControls{border-bottom:1px solid #ccdce3;padding:8px 10px}#estimateControls label{display:block;font-size:12px;margin:7px 0}#estimateControls select{display:block;width:100%;max-width:100%;font-size:12px;padding:4px}#estimateControls small{display:block;margin:7px 0;line-height:1.4}#estimateControls button{font-size:12px;padding:5px 7px;margin-right:5px}.estimateLegend{width:100%;font-size:12px;line-height:1.5}.estimateRamp{height:13px;margin:7px 0;border:1px solid #b1bfc4}.estimateEnds{display:flex;justify-content:space-between;gap:12px}#estimateMethods{width:min(850px,90vw);max-height:85vh;overflow:auto;line-height:1.5}#estimateMethods pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}#estimateMethods math{display:block math;margin:16px 0;font-size:1.2em}`;document.head.appendChild(style);
  const box=document.createElement('details');box.id='estimateControls';box.open=true;box.hidden=true;
- box.innerHTML='<summary>Exploratory estimates</summary><small id="estimateStage"></small>'+[['Feature','Target'],['Transform','Transformation'],['Estimator','Estimator'],['K','Neighborhood size'],['Geometry','Estimation distance'],['Scope','Estimation scope']].map(([id,label])=>`<label>${label}<select id="estimate${id}" aria-label="Estimate ${label.toLowerCase()}"></select></label>`).join('')+'<label><input id="estimateClip" type="checkbox" checked> Limit colors to central 95%</label><small id="estimateDescription"></small><small id="estimateStatus" role="status"></small><button id="estimateRetry" type="button" hidden>Retry estimates</button><button id="estimateMethodsButton" type="button">Methods…</button><button id="estimateExport" type="button">Download field CSV</button>';
+ box.innerHTML='<summary>Exploratory estimates</summary><small id="estimateStage"></small>'+[['Feature','Target'],['Transform','Transformation'],['Estimator','Estimator'],['K','Neighborhood size'],['Geometry','Estimation distance'],['Scope','Estimation scope']].map(([id,label])=>`<label>${label}<select id="estimate${id}" aria-label="Estimate ${label.toLowerCase()}"></select></label>`).join('')+'<label><input id="estimateClip" type="checkbox" checked> Limit colors to central 95%</label><small id="estimateDescription"></small><small id="estimateStatus" role="status"></small><button id="estimateRetry" type="button" hidden>Retry estimates</button><button id="estimateMethodsButton" type="button">Methods…</button><button id="estimateExport" type="button">Download field CSV</button><button id="estimateReport" type="button" hidden>Report PDF</button>';
  const summary=el('sampleSummary');summary.before(box);
  const fields=[['Feature','featureId'],['Transform','transformationId'],['Estimator','estimatorId'],['K','k'],['Geometry','geometryId'],['Scope','scopeId']];
  for(const [id,field] of fields)el('estimate'+id).onchange=()=>{
   const m=estimateModel(),old=estimateSelection(),wanted=el('estimate'+id).value,category=sampleColorMode().slice(9);
-  let rows=m.series.filter(s=>m.features.get(s.featureId).categoryId===category);
+  let rows=m.byCategory.get(category)||[];
   for(const [,earlier] of fields){if(earlier===field)break;rows=rows.filter(s=>String(s[earlier])===String(old[earlier]))}
   rows=rows.filter(s=>String(s[field])===wanted);
   rows.sort((a,b)=>fields.reduce((score,[,f])=>score+(String(b[f])===String(old[f])?1:0)-(String(a[f])===String(old[f])?1:0),0));
@@ -67,19 +69,21 @@ function estimateInstall(){
  el('estimateRetry').onclick=()=>recolorSampleView().catch(estimateFailure);
  el('estimateMethodsButton').onclick=()=>estimateMethods().catch(estimateFailure);
  el('estimateExport').onclick=estimateExport;
+ el('estimateReport').onclick=()=>estimateReport().catch(estimateFailure);
 }
 function estimateSyncControls(){
  if(!estimateAsset()&&!el('estimateControls'))return;estimateInstall();
  const active=estimateActive(),box=el('estimateControls');box.hidden=!active;if(!active)return;
  const m=estimateModel(),s=estimateSelection();if(!s)return;
  const feature=m.features.get(s.featureId),transform=feature.transformations.find(t=>t.id===s.transformationId);
- let rows=m.series.filter(item=>m.features.get(item.featureId).categoryId===feature.categoryId);
+ let rows=m.byCategory.get(feature.categoryId)||[];
  const choices=[['Feature','featureId',v=>m.features.get(v).label],['Transform','transformationId',v=>feature.transformations.find(t=>t.id===v).label],['Estimator','estimatorId',v=>rows.find(r=>r.estimatorId===v).estimatorLabel],['K','k',v=>(s.kMeaning==='case_participants'?'k = ':'K = ')+v+(s.kMeaning==='case_participants'?' case participants':' people')],['Geometry','geometryId',v=>m.asset.geometries.find(g=>g.id===v).label],['Scope','scopeId',v=>v==='all'||v==='global'?'Full eligible reference':m.asset.scopes.find(g=>g.id===v)?.description||v]];
  for(const [id,key,label] of choices){const node=el('estimate'+id),values=[...new Set(rows.map(r=>r[key]))];node.replaceChildren(...values.map(value=>{const o=document.createElement('option');o.value=String(value);o.textContent=label(value);return o}));node.value=String(s[key]);node.disabled=values.length<2;node.parentElement.hidden=['Geometry','Scope'].includes(id)&&values.length<2;rows=rows.filter(r=>r[key]===s[key])}
  el('estimateClip').checked=m.clip;
- el('estimateStage').textContent=m.asset.releaseStage==='pilot'?'Pilot: five example features. The complete catalogue and illustrated report are pending.':'Exploratory estimates; not tests of association or calibrated risk.';
+ el('estimateStage').textContent=m.asset.releaseStage==='pilot'?'Pilot: five example features. The complete catalogue and illustrated report are pending.':'Full catalogue: '+m.features.size.toLocaleString()+' targets and '+m.series.length.toLocaleString()+' combinations. Exploratory estimates, not calibrated risk.';
  el('estimateDescription').textContent=[...new Set([feature.description,transform.description])].join(' ');
  el('estimateExport').disabled=!estimateCurrent();
+ el('estimateReport').hidden=!m.asset.documentation?.some(d=>d.id==='report');
 }
 function estimateFailure(error){if(el('estimateStatus')){el('estimateStatus').textContent=error.message;el('estimateRetry').hidden=false}console.error(error)}
 async function estimateEnsure(){
@@ -136,7 +140,7 @@ function estimateRenderLegend(entries){
  let html='<div class="estimateLegend"><strong>'+esc(m.features.get(s.featureId).label)+'</strong><br>'+esc(s.quantityLabel)+'<br>';
  const limits=c&&estimateLimitsCached(c);
  if(limits){html+='<div class="estimateRamp" style="background:linear-gradient(to right,'+estimateViridis.join(',')+')"></div><div class="estimateEnds"><span>'+(m.clip?'≤ ':'')+esc(estimateValueText(limits[0],s))+'</span><span>'+(m.clip?'≥ ':'')+esc(estimateValueText(limits[1],s))+'</span></div><div>'+esc(s.unit)+'</div><small>'+(m.clip?'Colors clipped at the 2.5th and 97.5th percentiles.':'Colors span the full estimate range.')+' Limits use the full field and stay fixed across selections and embeddings. Hover values are unchanged.</small>'}
- else html+='<p>No loaded estimates for this field.</p>';
+ else html+='<p>'+(c?'No supported estimates at this neighborhood size.':'No loaded estimates for this field.')+'</p>';
  const geometry=m.asset.geometries.find(g=>g.id===s.geometryId);
  const scope=m.asset.scopes?.find(item=>item.id===s.scopeId);
  if(scope)html+='<p>'+esc(scope.description)+'</p>';
@@ -145,6 +149,14 @@ function estimateRenderLegend(entries){
  html+=[...counts].filter(([status])=>status!=='ok').map(([status,n])=>'<div><span class="colorSwatch" style="background:'+estimateNeutral+'"></span>'+esc(m.asset.statusCodes[status]||status)+': '+n+'</div>').join('');
  html+='<small>Gray background/dimming controls remain active. State memberships and the graph are unchanged. These are exploratory summaries, not association tests or calibrated disease risks.</small></div>';
  el('sampleLegend').hidden=false;el('sampleLegendItems').innerHTML=html;return true;
+}
+async function estimateReport(){
+ const m=estimateModel(),descriptor=m.asset.documentation?.find(d=>d.id==='report');if(!descriptor)return;
+ const button=el('estimateReport');button.disabled=true;
+ try{const doc=await VME_ASSETS.group('estimate-doc:'+m.asset.revision+':report',{parts:[descriptor.http]});
+  if(doc.mimeType!=='application/pdf'||!doc.base64)throw Error('The installed report is not a PDF.');
+  estimateDownload(Uint8Array.from(atob(doc.base64),c=>c.charCodeAt(0)),'MiCOVE-'+m.asset.datasetId+'-exploratory-estimates.pdf','application/pdf');
+ }finally{button.disabled=false}
 }
 function estimateDownload(text,name,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([text],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function estimateExport(){
@@ -158,10 +170,11 @@ async function estimateMethods(){
  let dialog=el('estimateMethods');if(!dialog){dialog=document.createElement('dialog');dialog.id='estimateMethods';document.body.appendChild(dialog)}
  dialog.replaceChildren();const close=document.createElement('button');close.textContent='Close';close.onclick=()=>dialog.close();dialog.appendChild(close);
  const print=document.createElement('button');print.textContent='Print / save methods as PDF';print.onclick=()=>{const w=window.open('','_blank');if(w){w.document.write('<!doctype html><title>MiCOVE estimate methods</title><style>body{max-width:50em;margin:3em auto;font:16px serif;line-height:1.5}button{display:none}pre{white-space:pre-wrap;font:inherit}math{display:block math;margin:20px}</style>'+dialog.innerHTML);w.document.close();w.print()}};dialog.appendChild(print);
+ if(m.asset.documentation?.some(d=>d.id==='report')){const report=document.createElement('button');report.textContent='Download illustrated report PDF';report.onclick=()=>estimateReport().catch(estimateFailure);dialog.appendChild(report)}
  const content=document.createElement('div');content.innerHTML='<h2>What is typical among nearby participants?</h2><p>The saved field summarizes answers from other people with similar microbiome profiles. It does not show the query person’s observed answer, an association test or a calibrated disease risk.</p><h3>Nearest-people mean</h3><math><mrow><mover><mi>m</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mfrac><mn>1</mn><mi>K</mi></mfrac><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><mi>g</mi><mo>(</mo><msub><mi>y</mi><mi>j</mi></msub><mo>)</mo></mrow></math><p>x is the query microbiome; K is the number of neighboring people; y is a neighbor’s recorded answer; g is the selected transformation, applied before averaging. One nearest answering visit represents each neighbor. All visits of the query participant are excluded.</p><h3>Nearest-case estimates</h3><math><mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mtext>raw</mtext></msub><mo>=</mo><mfrac><mi>k</mi><mi>T</mi></mfrac><mspace width="2em"/><msub><mover><mi>p</mi><mo>^</mo></mover><mtext>corrected</mtext></msub><mo>=</mo><mfrac><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow><mrow><mi>T</mi><mo>−</mo><mn>1</mn></mrow></mfrac></mrow></math><p>k is the requested number of people with a positive binary answer. T is the number of neighboring people required to reach the kth positive answer. “Case” means the selected binary target, including assay reporting or observed taxon presence. It need not mean disease. The correction addresses the stopping rule; it does not establish calibration.</p>';
  const add=(heading,text)=>{const h=document.createElement('h3');h.textContent=heading;const p=document.createElement('pre');p.textContent=text;content.append(h,p)};
  add('Selected target',feature.label+'\n'+[...new Set([feature.description,transform.description])].join('\n')+'\nUnit: '+s.unit+'\nZero handling: '+transform.zeroPolicy+'\nTransformation (LaTeX): '+transform.formulaTex+'\nParameters: '+JSON.stringify(transform.parameters,null,2));
  add('Neighborhood and support',Object.entries(s.estimation||{}).filter(([k])=>k!=='id').map(([k,v])=>k+': '+v).join('\n')+'\n'+JSON.stringify(s.counts,null,2));
- add('Limits',m.asset.limitations.join('\n')+'\n'+(m.asset.releaseStage==='pilot'?'Pilot examples; the complete illustrated report is pending.':''));dialog.appendChild(content);dialog.showModal();
+ add('Limits','Reference transformations, imputation and scaling were fixed before participant exclusion. These fields are not end-to-end cross-validated predictions.\n'+m.asset.limitations.join('\n')+'\n'+(m.asset.releaseStage==='pilot'?'Pilot examples; the complete illustrated report is pending.':''));dialog.appendChild(content);dialog.showModal();
  const doc=m.asset.documentation.find(d=>d.id==='methods');if(doc){const text=await VME_ASSETS.group('estimate-doc:'+m.asset.revision+':methods',{parts:[doc.http]});if(dialog.open&&estimateAsset()===m.asset)add('Catalogue reading guide',text.text)}
 }

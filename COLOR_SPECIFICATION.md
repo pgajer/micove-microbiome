@@ -592,8 +592,8 @@ no membership. Unknown genus assignments retain their explicit higher-rank label
 ### Separately supplied exploratory estimate catalogues
 
 An installed LSVF estimate catalogue adds Phylotypes, Metabolites, Immune markers,
-Bacterial load and Clinical metadata choices to **Color by**, each labeled
-“estimates”. Dependent target, transformation, estimator and neighborhood-size
+Bacterial load, Lactic acid, Clinical metadata and Assay availability choices
+to **Color by**, each labeled “estimates”. Dependent target, transformation, estimator and neighborhood-size
 controls appear in the sample sidebar. Only saved combinations are offered.
 These fields exclude the query participant and use their declared original-space
 distance, independently of the selected display embedding. They do not change
@@ -611,8 +611,9 @@ Binary fields show percentages but are not necessarily disease probabilities:
 for example, assay reporting is conditional on assay availability. The methods
 dialog and feature descriptions retain measurement, imputation and sampling
 limitations. The first five-feature integration catalogue is explicitly a pilot;
-its full illustrated report is pending. Preferences are stored by dataset and
-catalogue revision. See [catalogue format](rank2_feature_graph/ESTIMATE_CATALOGUE.md).
+the complete version 2 catalogue includes 1,129 targets and its illustrated PDF
+report. Original signed lactic-acid readings remain separate from corrected
+measurements. Preferences are stored by dataset and catalogue revision. See [catalogue format](rank2_feature_graph/ESTIMATE_CATALOGUE.md).
 
 ### AGP outcome probability colors
 

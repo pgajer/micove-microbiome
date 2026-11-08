@@ -69,3 +69,15 @@ assert.equal(unchanged,JSON.stringify({data,coords:plot.data.map(t=>[t.x,t.y,t.z
 assert.equal(JSON.stringify(selected),selectedBefore);
 assert.ok(calls.every(c=>Object.keys(c.updates).every(k=>['marker.color','hovertext','hovertemplate'].includes(k))));
 console.log('PASS: shared recoloring entry point changes only sample marker colors and hover fields, preserving selection, coordinates, camera and references.');
+
+// Full catalogues must not scan thousands of combinations for every point.
+run('estimateModel().series.filter=()=>{throw Error("Per-point catalogue scan")};');
+for(let i=0;i<2000;i++)assert.equal(run('estimateSelection().id'),'b');
+// Entirely unsupported fields remain gray, without recomputing limits per point.
+run('estimateCurrent().row.values=[null,null,null];estimateCurrent().row.status=["insufficient_cases","insufficient_cases","unknown_participant"];delete estimateCurrent().limits');
+let limitScans=0;
+const missing=run('estimateCurrent().row.values');const filter=missing.filter;
+missing.filter=function(...args){limitScans++;return filter.apply(this,args)};
+for(let i=0;i<100;i++)assert.equal(run('estimatePointColor(0)'),'#9ca3af');
+assert.equal(limitScans,1);
+console.log('PASS: constant-time field lookup and cached all-unsupported color limits.');

@@ -216,3 +216,24 @@ These cover lazy loading, stale-choice rejection, zero/negative/null fields,
 color-scale limits, hover restoration and unchanged coordinates/camera,
 additive packaging, identity rejection, and preservation of an existing install.
 Inspect an actual HTTP installation for rendering and interaction behavior too.
+
+## Complete LSVF catalogue, version 2
+
+The reviewed full release includes 1,129 targets and 30,516 combinations at the
+same 1,991 frozen positions. Seven categories include lactic acid and assay
+availability in addition to the pilot categories. Both original signed D/L
+readings and corrected measurements remain available as distinct targets.
+Negative uncorrected readings are not labeled negative biological concentrations.
+An unsupported combination stays gray with its reason, including when every
+query is unsupported; the viewer never substitutes another neighborhood size.
+
+The illustrated 12-page report is independently checksum-verified and downloaded
+through **Report PDF** or the methods dialog. PDF bytes are packaged intact;
+text documentation remains text. Frozen preprocessing, imputation and reference
+scales mean these fields are not end-to-end cross-validated predictions.
+
+Per-point field lookup uses a prebuilt index, while numerical arrays remain in
+one lazy shard per target. No full array catalogue is loaded into the browser.
+The uncompressed scientific export is about 2.85 GB and is supplied separately;
+software updates remember the installed export path. Full validation and asset
+integrity checks run when packaging the supplement, without fitting models.

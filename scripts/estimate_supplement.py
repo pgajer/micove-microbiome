@@ -1,4 +1,5 @@
 """Attach a reviewed estimate catalogue without changing samples or coordinates."""
+import base64
 import copy
 import json
 import os
@@ -19,6 +20,11 @@ REVIEWED = {
         featureOrderSha256='c2897169a41b5804c43ceece1748dda3687e262742859b7af2d13261d436371a',
         anchorOrderSha256={'pure-1cst': 'aed0320122624e52a18b1568df81010beaa882101ba8c29a1e5d68343359541a'},
         releaseStage='pilot'),
+}
+
+REVIEWED['ced1409d8633b388a1707432a6130938190e7de6e06a77fb4c606671ef24536b'] = {
+    **REVIEWED['5284988f7e2a09561f091973304b74df2d222e34b63ff15e14995cc92d1d69f4'],
+    'releaseStage': 'full',
 }
 
 
@@ -102,7 +108,14 @@ def attach(page_path, folder):
     documents = {}
     for descriptor in packaged.get('documentation', []):
         raw = checked_file(folder, descriptor)
-        http = publish(dict(name=Path(descriptor['file']).name, text=raw.decode()))
+        name = Path(descriptor['file']).name
+        if name.lower().endswith('.pdf'):
+            if not raw.startswith(b'%PDF-'):
+                raise ValueError('Invalid estimate report PDF signature')
+            document = dict(name=name, mimeType='application/pdf', base64=base64.b64encode(raw).decode('ascii'))
+        else:
+            document = dict(name=name, text=raw.decode())
+        http = publish(document)
         descriptor['http'] = http
         documents[descriptor['id']] = http
     index = publish({'estimateCatalogues': {dataset: packaged}})
