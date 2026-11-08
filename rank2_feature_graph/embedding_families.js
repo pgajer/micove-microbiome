@@ -608,12 +608,16 @@ function installEmbeddingFamilies(){
   section('Reference vertex labels',[el('familyVertexNote'),labelHelp]),interpretation,
   section('Exports',[el('familyCSV'),el('familyProvenance')]),receipt,
   section('About saved views',[savedViews.querySelector('p')]));
- // Use the same header organization as ordinary datasets, preserving each
- // neighborhood's existing method and coloring choices and event handlers.
+ // Preserve each neighborhood's existing choices and event handlers while
+ // grouping display settings in the plot sidebar, as in ordinary datasets.
  for(const [id,host] of [['familyEmbedding','familyHeaderEmbedding'],['familyColorMode','familyHeaderColor']]){
   const control=el(id),oldLabel=control.closest('label');el(host).appendChild(control);oldLabel.remove();
  }
  colorSection.hidden=true;
+ const viewControls=document.createElement('section');viewControls.className='sampleViewControls';viewControls.setAttribute('aria-label','Sample view settings');
+ const coloring=section('Sample coloring',[el('familyHeaderColor'),colorRules],true);coloring.className='sampleColoringControls';
+ viewControls.append(el('familyHeaderEmbedding'),coloring,el('familyLegendPosition').closest('label'));
+ information.prepend(viewControls);
  const appearance=section('Sample appearance',[vertexControls,el('familyAppearanceControls')],true);
  information.insertBefore(appearance,el('familyStatus'));
  el('familyColorCoverage').closest('label').firstChild.textContent='Largest 2-CSTs coverage';

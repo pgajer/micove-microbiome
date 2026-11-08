@@ -41,7 +41,9 @@ async function showSkinPopulation(data, choices) {
  el('sampleInfoDivider').removeAttribute('tabindex');
  el('sampleInfoDivider').removeAttribute('title');
  el('sampleInfoDivider').style.pointerEvents='none';
- el('samplePanel').querySelector('.sampleHeaderActions').replaceChildren(method.closest('label'));
+ const viewControls=document.createElement('section');viewControls.className='sampleViewControls';viewControls.setAttribute('aria-label','Sample view settings');
+ viewControls.append(method.closest('label'));el('sampleSidePanels').prepend(viewControls);
+ el('samplePanel').querySelector('.sampleHeaderActions').replaceChildren();
  el('sampleStress').hidden=true;
  el('toggleControls').onclick=()=>{
   const collapsed=el('explorerLayout').classList.toggle('controlsCollapsed');

@@ -30,7 +30,7 @@ function updateDatasetChoices(){
 // Move the existing widgets, preserving their handlers, values and saved identities.
 let sampleControlHeaderSlots=null;
 function syncSampleControlPlacement(){
- const sidebar=el('sampleSidePanels'),active=META.id==='lsvf-v3v4-20241111'&&!activeEmbeddingFamily;
+ const sidebar=el('sampleSidePanels'),active=!activeEmbeddingFamily;
  let controls=el('sampleViewControls');
  if(active){
   if(!controls){

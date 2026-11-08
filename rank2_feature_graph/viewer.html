@@ -92,12 +92,12 @@ body.panelMaximized{overflow:hidden}
 #sampleContent[data-legend-position="right"] .legendItem{flex-shrink:0}
 .legendPositionControl{display:inline-flex;align-items:center;gap:4px;font-size:12px}
 #sampleLegendPosition{font-size:12px;padding:3px 5px}
-#sampleViewControls{padding:8px 10px;border-bottom:1px solid #ccdce3;font-size:12px}
-#sampleViewControls>label,#sampleViewControls #sampleColorLabel{display:grid;gap:4px;margin:8px 0;max-width:100%}
-#sampleViewControls>label:has(input[type=checkbox]){display:flex;align-items:center;gap:5px;white-space:normal}
-#sampleViewControls>label select,#sampleViewControls #sampleColorScheme{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:12px}
-#sampleViewControls [hidden]{display:none!important}
-#sampleColoringControls{margin:10px 0}#sampleColoringControls>summary{font-weight:600}
+#sampleViewControls,.sampleViewControls{padding:8px 10px;border-bottom:1px solid #ccdce3;font-size:12px}
+:is(#sampleViewControls,.sampleViewControls) label{display:grid;gap:4px;margin:8px 0;max-width:100%}
+:is(#sampleViewControls,.sampleViewControls) label:has(input[type=checkbox]){display:flex;align-items:center;gap:5px;white-space:normal}
+:is(#sampleViewControls,.sampleViewControls) label select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:12px}
+:is(#sampleViewControls,.sampleViewControls) [hidden]{display:none!important}
+#sampleColoringControls,.sampleColoringControls{margin:10px 0}:is(#sampleColoringControls,.sampleColoringControls)>summary{font-weight:600}
 #sampleColoringControls #estimateControls{padding:8px 0;border-bottom:0}
 
 

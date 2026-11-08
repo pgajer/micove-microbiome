@@ -131,7 +131,7 @@ async function showAgpPopulation(data, choices, references, graphLayouts, localF
  backgroundControl.append(background,' Show background samples');backgroundControl.hidden=true;
  backgroundControl.title='Keep samples outside the selected graph boundary in gray for context. Turn off to show only selected samples, at the same saved coordinates. A 1-CST edge connects boundary samples from both endpoint states.';
  const colorLabel=color.closest('label'),assignLabel=assign.closest('label'),methodLabel=method.closest('label');
- header.replaceChildren(navigation,backgroundControl,save);
+ header.replaceChildren(navigation,save);
  el('controlSections').replaceChildren(el('dataControls'));
  el('cohortControl').hidden=true;
  el('datasetMessage').textContent=data.ids.length.toLocaleString()+' fecal samples · 340 SILVA taxa';
@@ -191,7 +191,8 @@ async function showAgpPopulation(data, choices, references, graphLayouts, localF
  coloring.append(coloringTitle,colorLabel,schemeLabel,assignLabel);
  appearance.querySelector('summary').after(labelControl);
  unfoldControl.classList.add('agpCheck');
- group.replaceChildren(group.querySelector('summary'),appearance);side.replaceChildren(methodLabel,unfoldControl,coloring,group);
+ backgroundControl.classList.add('agpCheck');
+ group.replaceChildren(group.querySelector('summary'),appearance);side.replaceChildren(methodLabel,unfoldControl,backgroundControl,coloring,group);
  el('sampleSidePanels').replaceChildren(side,info);info.style.padding='8px';
  el('sampleInfoDivider').remove();
  el('sampleContent').removeAttribute('data-legend-position');

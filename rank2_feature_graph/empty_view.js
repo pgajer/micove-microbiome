@@ -1,6 +1,11 @@
 // Presentation mode intentionally has no scientific loader or browser-storage access.
 (() => {
  const el = id => document.getElementById(id);
+ const viewControls=document.createElement('section');viewControls.id='sampleViewControls';viewControls.setAttribute('aria-label','Sample view settings');
+ const coloring=document.createElement('details');coloring.id='sampleColoringControls';coloring.open=true;
+ const heading=document.createElement('summary');heading.textContent='Sample coloring';coloring.append(heading,el('valenciaColorControls'));
+ viewControls.append(el('sampleMethod').closest('label'),el('unfoldFaces').closest('label'),el('unfoldAnchor').closest('label'),coloring,el('sampleLegendPosition').closest('label'));
+ el('sampleSidePanels').prepend(viewControls);
  for (const id of ['datasetSelect', 'panelDatasetSelect']) {
   const selector = el(id);
   selector.onchange = () => {
