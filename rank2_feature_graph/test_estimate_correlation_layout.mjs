@@ -45,3 +45,39 @@ assert.equal(exported.length,3);const distances=JSON.parse(exported[1].text);ass
 const meta=JSON.parse(exported[2].text);assert.equal(meta.relativeRms,result.relativeRms);assert.equal(meta.settings.epochs,500);
 assert.equal(run('estimateCorrelationLayoutFiles("x",null,()=>"").length'),0);
 console.log('PASS: serial worker reuse, duplicate-job/cache reuse, numerical cache invalidation, cancellation and exact diagnostic exports.');
+// Retained-edge geometry: signed lengths, shortest paths and disconnected scope.
+run('weightedGraph={nodes:[{key:"a",members:[0]},{key:"b",members:[1]},{key:"c",members:[2]},{key:"d",members:[3]}],edges:[]}; weightedGraph.edges=[{source:weightedGraph.nodes[0],target:weightedGraph.nodes[1],mean:.9},{source:weightedGraph.nodes[1],target:weightedGraph.nodes[2],mean:-.8},{source:weightedGraph.nodes[0],target:weightedGraph.nodes[2],mean:.1}]');
+run('weightedInput=estimateCorrelationWeightedInput(weightedGraph,{graphThreshold:.3,graphSign:"both"})');
+assert.equal(run('weightedInput.nodes.length'),3,'Degree-zero nodes excluded from fit');
+assert.equal(run('weightedInput.edges.length'),2);assert(run('weightedInput.edges[1].length>weightedInput.edges[0].length'),'Negative edge requests longer length');
+assert(Math.abs(run('estimateCorrelationGraphDistances(weightedInput).distances[0][2]')-Math.sqrt(.2)-Math.sqrt(3.6))<1e-12,'Path length sums retained edges');
+run('positiveInput=estimateCorrelationWeightedInput(weightedGraph,{graphThreshold:.3,graphSign:"positive"})');assert.equal(run('positiveInput.nodes.length'),2,'Sign filtering changes weighted graph membership');
+run('perfectGraph={nodes:weightedGraph.nodes.slice(0,2),edges:[{source:weightedGraph.nodes[0],target:weightedGraph.nodes[1],mean:1}]};perfectInput=estimateCorrelationWeightedInput(perfectGraph,{graphThreshold:.3,graphSign:"both"})');
+assert.equal(run('perfectInput.edges[0].rawLength'),0);assert.equal(run('perfectInput.edges[0].length'),1e-6,'Strictly positive floor recorded');
+run('disconnected={nodes:[0,1,2,3],edges:[{source:0,target:1,length:2},{source:2,target:3,length:3}]};disconnectedPositions=[[0,0],[2,0],[1000,0],[1003,0]];weightedDiagnostics=estimateCorrelationWeightedDiagnostics(disconnected,disconnectedPositions)');
+assert.equal(run('weightedDiagnostics.relativeRms'),0);assert.equal(run('weightedDiagnostics.componentCount'),2);assert.equal(run('weightedDiagnostics.connectedPairs'),2);assert.equal(run('weightedDiagnostics.disconnectedPairs'),4,'Arbitrary component spacing excluded from error');
+run('triangle={nodes:[0,1,2],edges:[{source:0,target:1,length:1},{source:1,target:2,length:1},{source:0,target:2,length:3}]}');
+assert.equal(run('estimateCorrelationGraphDistances(triangle).distances[0][2]'),2,'Shorter alternate route can override a direct edge');
+assert.equal(run('estimateCorrelationWeightedDiagnostics({nodes:[],edges:[]},[]).relativeRms'),null);
+assert.equal(run('weightedGraph.nodes.length'),4,'Original graph preserved');
+console.log('PASS: signed positive lengths, floor provenance, retained-edge paths, disconnected-pair exclusion, alternate routes and input preservation.');
+// Local-service queue, exact runtime identity, stale jobs and portable error message.
+let requests=0,active=0,maxActive=0,runtimeId='r1',offline=false;
+context.fetch=async(url,options)=>{
+ if(offline)throw Error('offline');
+ if(!options?.method)return {ok:true,json:async()=>({runtimeId})};
+ requests++;active++;maxActive=Math.max(maxActive,active);await new Promise(resolve=>setTimeout(resolve,2));active--;
+ const request=JSON.parse(options.body),distance=request.edges[0][2];
+ return {ok:true,json:async()=>({...request,coords:[[0,0],[distance,0]],runtimeId,requestHash:String(requests),settings:{threads:1},runtime:{grip:'test'},components:[]})};
+};
+const shared=await Promise.all([run('estimateCorrelationWeightedFit(positiveInput)'),run('estimateCorrelationWeightedFit(positiveInput)')]);
+assert.equal(requests,1);assert.equal(shared[0],shared[1]);assert.equal(shared[0].relativeRms,0);
+await run('estimateCorrelationWeightedFit(positiveInput)');assert.equal(requests,1,'Same runtime reuses exact result');
+runtimeId='r2';await run('estimateCorrelationWeightedFit(positiveInput)');assert.equal(requests,2,'Runtime change invalidates result');
+await Promise.all([run('estimateCorrelationWeightedFit(perfectInput)'),run('estimateCorrelationWeightedFit({...positiveInput,threshold:.4})')]);assert.equal(maxActive,1,'R requests serialized');
+const old=run('estimateCorrelationWeightedFit({...positiveInput,threshold:.5})');run('estimateCorrelationLayoutCancel()');assert.equal(await old,null,'Queued stale job never applied');
+offline=true;await assert.rejects(run('estimateCorrelationWeightedFit(positiveInput)'),/Start MiCOVE with GRIP/);
+context.weightedSaved={method:'weighted_grip',input:run('positiveInput'),fit:shared[0]};
+const weightedExported=run('estimateCorrelationLayoutFiles("x",weightedSaved,rows=>JSON.stringify(rows))');
+assert.equal(weightedExported.length,4);assert(weightedExported.some(f=>f.name.endsWith('weighted-grip-distances.csv')));assert.equal(JSON.parse(weightedExported[3].text).connectedPairs,1);
+console.log('PASS: serialized service, runtime-aware cache, cancellation, unavailable-service guidance and weighted export agreement.');

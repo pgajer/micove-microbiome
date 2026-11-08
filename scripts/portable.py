@@ -170,6 +170,19 @@ def write_launchers(output, launcher):
     for name in ('Start CoSMiX.command', 'Start VME.command'):
         (output / name).symlink_to('Start MiCOVE.command')
     (output / 'micove-server').symlink_to('vme-server')
+    service = output / 'graph-service'
+    service.mkdir()
+    for name in ('graph_layout_service.py', 'graph_layout_worker.R', 'serve_graph_layouts.py'):
+        shutil.copy2(HERE / name, service / name)
+    shutil.copy2(ROOT / 'GRAPH_LAYOUTS.md', output / 'GRAPH_LAYOUTS.md')
+    optional = output / 'Start MiCOVE with GRIP.command'
+    optional.write_text('''#!/bin/bash
+set -eu
+cd -- "$(dirname -- "$0")"
+echo "Open http://127.0.0.1:${VME_PORT:-43818} in your browser. Keep this Terminal open."
+exec python3 graph-service/serve_graph_layouts.py --web "$PWD/web" --port "${VME_PORT:-43818}"
+''')
+    optional.chmod(0o755)
 
 
 def prepare(package, metadata_path, output, announce=True):

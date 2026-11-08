@@ -461,3 +461,16 @@ CSVs keep their visibility fields. These small display fits are on demand and
 never run in the installer or update command.
 
 Focused check: `node rank2_feature_graph/test_estimate_correlation_layout.mjs`.
+
+### Weighted-GRIP cluster graph layout
+
+**2D weighted GRIP** uses the separately installed R `grip::grip()` engine through
+a local service. See [setup, targets, runtime bounds and tests](../GRAPH_LAYOUTS.md).
+Only currently retained edges define its positive correlation-based lengths and
+weighted shortest paths. Threshold/sign changes can therefore move nodes. Fits
+are serialized and keyed by exact inputs and runtime identity. Missing service
+or dependencies produce an explanation; they never silently substitute another
+algorithm. The clickable error label documents connected-pair RMS relative error,
+with disconnected-pair counts and direct-edge error on hover. Exports preserve
+targets, coordinates, components and diagnostics. Estimates and sample coordinates
+are unchanged.

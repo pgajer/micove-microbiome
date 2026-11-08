@@ -168,3 +168,8 @@
 !/rank2_feature_graph/estimate_correlation_layout.js
 
 !/rank2_feature_graph/test_estimate_correlation_layout.mjs
+!/rank2_feature_graph/graph_layout_service.py
+!/rank2_feature_graph/graph_layout_worker.R
+!/GRAPH_LAYOUTS.md
+!/rank2_feature_graph/serve_graph_layouts.py
+!/rank2_feature_graph/test_optional_graph_service.py

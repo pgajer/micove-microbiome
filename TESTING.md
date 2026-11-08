@@ -325,3 +325,7 @@ python3 -m unittest discover -s scripts -p test_agp_epoch500.py
 
 These checks use existing saved assets, do not run fits, and are outside the
 update command. The browser integration test above also recognizes the new pair.
+
+Optional correlation-graph weighted-GRIP service: see [GRAPH_LAYOUTS.md](GRAPH_LAYOUTS.md)
+for the focused JavaScript, HTTP and real-R tests. These run only on demand and
+are not part of installation or updating.

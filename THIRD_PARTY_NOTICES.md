@@ -21,3 +21,8 @@ distributed research data described in [LICENSING.md](LICENSING.md).
 The portable viewer uses the Plotly JavaScript library supplied in the separate
 runtime data package. Preserve its bundled license and copyright notices.
 The clean source snapshot does not vendor that library.
+
+The optional local weighted-GRIP service invokes a separately installed
+[grip R package](https://github.com/pgajer/grip), licensed GPL-3 or later. Its
+code and R runtime are not bundled with MiCOVE's MIT-licensed source or app.
+See GRAPH_LAYOUTS.md for installation and operation.

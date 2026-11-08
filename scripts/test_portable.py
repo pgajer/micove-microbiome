@@ -255,6 +255,12 @@ class UpdateTests(unittest.TestCase):
         for name in ('Start MiCOVE.command', 'Start CoSMiX.command', 'Start VME.command'):
             self.assertEqual((output / name).read_text(), '#!/bin/bash\necho MiCOVE\n')
         self.assertEqual((output / 'micove-server').read_text(), 'original native server')
+        optional = (output / 'Start MiCOVE with GRIP.command').read_text()
+        self.assertIn('exec python3 graph-service/serve_graph_layouts.py', optional)
+        self.assertNotIn('install_github', optional)
+        self.assertTrue((output / 'GRAPH_LAYOUTS.md').is_file())
+        for name in ('serve_graph_layouts.py', 'graph_layout_service.py', 'graph_layout_worker.R'):
+            self.assertEqual((output / 'graph-service' / name).read_bytes(), (portable.HERE / name).read_bytes())
 
     def test_build_and_validation_failures_preserve_old_app(self):
         self.install_old()

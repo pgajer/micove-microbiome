@@ -59,7 +59,7 @@ def page(title, body, explorer):
 
 def source_digest(here):
     """Fingerprint builder/viewer/helper sources, policy and palette contents."""
-    files = sorted([*here.glob('*.py'), *here.glob('*.js'), *here.glob('*.mjs'),
+    files = sorted([*here.glob('*.py'), *here.glob('*.js'), *here.glob('*.mjs'), *here.glob('*.R'),
                     *here.glob('mutual_overlap_ui/*'), here/'viewer.html', here/'QUALITY_PREVIEW_POLICY.md', *here.glob('palettes/*.csv')])
     digest = hashlib.sha256()
     for path in files:

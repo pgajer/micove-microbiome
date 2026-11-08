@@ -299,3 +299,8 @@ Keep this directory outside the app too; later updates remember it. Installed
 skin populations appear under **Dataset → Skin**, with **Cohort** selecting an
 independent population. The supplement adds coverage and coloring controls;
 it does not change the original ASV-based embedding maps or fit new models.
+
+For optional correlation-graph weighted-GRIP layouts, the updater also provides
+**Start MiCOVE with GRIP.command**. R and grip are installed separately; follow
+[GRAPH_LAYOUTS.md](GRAPH_LAYOUTS.md). The ordinary launcher and update command do
+not require R or run these fits.
