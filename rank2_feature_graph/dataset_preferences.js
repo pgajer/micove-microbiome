@@ -90,6 +90,7 @@ function restoreDatasetPanelSettings(){
  if(!datasetPanelReady)return;
  datasetPanelRestoring=true;
  try{
+  if(typeof estimateSyncOptions==='function')estimateSyncOptions();
   trajectorySettings={...trajectoryDefaults,taxonColors:{}};
   try{const s=panelReadJson(trajectoryPreference,null);validateTrajectorySettings(s);trajectorySettings={...trajectoryDefaults,...s,endpointFontSize:s.endpointFontSize??s.fontSize}}catch{}
   trajectoryRanges=null;trajectoryRestoredScale=null;trajectoryContext='';trajectoryFitAll=false;

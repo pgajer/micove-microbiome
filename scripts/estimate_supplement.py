@@ -1,0 +1,118 @@
+"""Attach a reviewed estimate catalogue without changing samples or coordinates."""
+import copy
+import json
+import os
+from pathlib import Path
+import re
+import tempfile
+
+import portable as p
+from estimate_catalogue import STATUS_CODES, checked_file, load_catalogue, order_hash, read_json
+
+
+# Scientific arrays and identifiers remain in separately distributed files.
+REVIEWED = {
+    '5284988f7e2a09561f091973304b74df2d222e34b63ff15e14995cc92d1d69f4': dict(
+        datasetId='lsvf-v3v4-20241111', datasetRevision='bb8d80f0da6b30cb7877',
+        analysisRevision='8932ed4151605b91d0cc', sampleCount=1991, featureCount=559,
+        sampleOrderSha256='44d3f0200eed2a7653e642b312231f8b227ff40d15037f0d0d42fdfcc065c41c',
+        featureOrderSha256='c2897169a41b5804c43ceece1748dda3687e262742859b7af2d13261d436371a',
+        anchorOrderSha256={'pure-1cst': 'aed0320122624e52a18b1568df81010beaa882101ba8c29a1e5d68343359541a'},
+        releaseStage='pilot'),
+}
+
+
+def export_files(value):
+    """Find shared transformation references as well as explicit file lists."""
+    if isinstance(value, dict):
+        if {'file', 'sha256', 'bytes'} <= value.keys():
+            yield value
+        for item in value.values():
+            yield from export_files(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from export_files(item)
+
+
+def checked_catalogue(folder):
+    folder = Path(folder)
+    digest = p.sha((folder / 'manifest.json').read_bytes())
+    expected = REVIEWED.get(digest)
+    if expected is None:
+        raise ValueError('Estimate catalogue has not been reviewed for this source version')
+    manifest, summary = load_catalogue(folder, expected)
+    receipt = read_json((folder / 'validation.json').read_bytes())
+    if receipt.get('passed') is not True or receipt.get('manifestSha256') != digest or receipt.get('revision') != manifest['revision']:
+        raise ValueError('Estimate catalogue validation receipt differs')
+    for field in ('features', 'series', 'sampleCount'):
+        actual = summary.get(field, summary['samples'])
+        if receipt.get(field) != actual:
+            raise ValueError('Estimate catalogue receipt count differs: ' + field)
+    for descriptor in export_files(manifest):
+        checked_file(folder, descriptor)
+    return manifest, expected, digest
+
+
+def attach(page_path, folder):
+    page_path, folder = Path(page_path), Path(folder)
+    catalogue, expected, digest = checked_catalogue(folder)
+    page = page_path.read_text()
+    manifest = p.read_manifest(page_path)
+    dataset = catalogue['datasetId']
+    entry = manifest['datasets'].get(dataset)
+    if entry is None:
+        return None  # Preserve the optional input when this dataset is uninstalled.
+    # Resolve only the owning dataset's eager parts; never touch fitted banks.
+    participants = None
+    for descriptor in entry['parts']:
+        part = read_json(p.checked_bytes(page_path.parent, descriptor))
+        candidate = part.get('participants', {}).get(dataset)
+        if candidate is not None:
+            participants = candidate
+    if (entry['dataset']['revision'] != expected['datasetRevision'] or not participants
+            or participants['analysisRevision'] != expected['analysisRevision']
+            or order_hash([r['id'] for r in participants['records']]) != expected['sampleOrderSha256']
+            or len(participants['features']) != expected['featureCount']):
+        raise ValueError('Estimate catalogue does not match the installed dataset')
+    packaged = copy.deepcopy(catalogue)
+    packaged['releaseStage'] = expected['releaseStage']
+    packaged['sampleIds'] = [r['id'] for r in participants['records']]
+    packaged['statusCodes'] = {**STATUS_CODES, **catalogue.get('statusCodes', {})}
+    directory = page_path.parent / 'vme-assets'
+    directory.mkdir(parents=True, exist_ok=True)
+
+    def publish(data):
+        raw = p.encoded(data)
+        sha = p.sha(raw)
+        descriptor = dict(url='/vme-assets/' + sha + '.json', sha256=sha, bytes=len(raw))
+        target = p.asset_path(page_path.parent, descriptor)
+        if target.exists():
+            p.checked_bytes(page_path.parent, descriptor)
+        else:
+            target.write_bytes(raw)
+        return descriptor
+
+    shards = {}
+    for descriptor in packaged['shards']:
+        http = publish(read_json(checked_file(folder, descriptor)))
+        descriptor['http'] = http
+        shards[descriptor['id']] = http
+    # Package checked documentation as JSON so the existing integrity loader can
+    # retrieve it on demand; text is rendered without trusting source HTML.
+    documents = {}
+    for descriptor in packaged.get('documentation', []):
+        raw = checked_file(folder, descriptor)
+        http = publish(dict(name=Path(descriptor['file']).name, text=raw.decode()))
+        descriptor['http'] = http
+        documents[descriptor['id']] = http
+    index = publish({'estimateCatalogues': {dataset: packaged}})
+    previous = entry.get('estimateAssets', {}).get('index', {}).get('url')
+    entry['parts'] = [d for d in entry['parts'] if d['url'] != previous] + [index]
+    entry['estimateAssets'] = dict(index=index, shards=shards, documents=documents)
+    encoded = p.encoded(manifest).decode().replace('</', '<\\/')
+    page = re.sub(p.PATTERN, lambda _: '<script id="vme-http-manifest" type="application/json">' + encoded + '</script>', page, count=1, flags=re.S)
+    with tempfile.NamedTemporaryFile(dir=page_path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        stream.write(page.encode())
+    os.replace(temporary, page_path)
+    return digest

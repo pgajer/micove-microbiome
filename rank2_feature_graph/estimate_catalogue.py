@@ -1,0 +1,341 @@
+"""Validate a separately distributed catalogue of exploratory color fields.
+
+This module performs no statistical estimation, admission or imputation. The
+caller supplies a trusted identity receipt for the existing dataset release.
+"""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path, PurePosixPath
+import re
+
+
+HASH = re.compile(r'[a-f0-9]{64}')
+IDENTITY_FIELDS = ('datasetId', 'datasetRevision', 'analysisRevision',
+                   'sampleCount', 'sampleOrderSha256', 'featureOrderSha256')
+STATUS_CODES = {
+    'ok': 'Estimate available',
+    'outside_scope': 'Outside the declared estimation scope',
+    'unknown_participant': 'Participant identity is unavailable',
+    'insufficient_neighbors': 'Too few eligible neighbors',
+    'insufficient_cases': 'Too few eligible case participants',
+    'invalid_input': 'Input is not valid for this estimate',
+    'unsupported_transform': 'Transformation is undefined',
+}
+SERIES_DEFAULT_FIELDS = {
+    'geometryId', 'estimatorId', 'estimatorLabel', 'k', 'kMeaning', 'scopeId',
+    'resultKind', 'quantityLabel', 'unit', 'valueDomain', 'estimationId',
+}
+POLICY_FIELDS = ('trainingPopulation', 'queryPopulation', 'weighting', 'queryExclusion',
+                 'participantExclusion', 'tiePolicy')
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError('Estimate catalogue: ' + message)
+
+
+def text(value):
+    return isinstance(value, str) and bool(value.strip())
+
+
+def number(value):
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def integer(value, minimum=0):
+    return type(value) is int and value >= minimum
+
+
+def order_hash(strings):
+    require(all(text(s) and '\n' not in s and '\r' not in s for s in strings),
+            'invalid identity string')
+    return hashlib.sha256(('\n'.join(strings) + '\n').encode()).hexdigest()
+
+
+def read_json(raw):
+    def unique(pairs):
+        value = {}
+        for key, item in pairs:
+            require(key not in value, 'duplicate JSON key: ' + key)
+            value[key] = item
+        return value
+
+    def invalid(value):
+        raise ValueError('Estimate catalogue: non-finite JSON constant ' + value)
+
+    def finite_float(value):
+        result = float(value)
+        require(math.isfinite(result), 'non-finite JSON number')
+        return result
+
+    return json.loads(raw, object_pairs_hook=unique, parse_constant=invalid,
+                      parse_float=finite_float)
+
+
+def indexed(rows, label):
+    require(isinstance(rows, list), label + ' must be a list')
+    result = {}
+    for row in rows:
+        require(isinstance(row, dict) and text(row.get('id')), label + ' needs an ID')
+        require(row['id'] not in result, 'duplicate ' + label + ' ID: ' + row['id'])
+        result[row['id']] = row
+    return result
+
+
+def estimation_policy(policy):
+    require(isinstance(policy, dict), 'estimation policy must be an object')
+    resolved = dict(policy)
+    for alias, canonical in (('observationWeighting', 'weighting'), ('ties', 'tiePolicy')):
+        if alias in resolved:
+            require(canonical not in resolved or resolved[canonical] == resolved[alias],
+                    'ambiguous estimation policy alias')
+            resolved[canonical] = resolved[alias]
+    require(all(text(resolved.get(k)) for k in POLICY_FIELDS), 'estimation policy is incomplete')
+    return resolved
+
+
+def checked_file(folder, descriptor):
+    require(isinstance(descriptor, dict), 'file descriptor is missing')
+    name, checksum, size = (descriptor.get(k) for k in ('file', 'sha256', 'bytes'))
+    require(text(name) and '\\' not in name and not PurePosixPath(name).is_absolute()
+            and all(p not in ('', '.', '..') for p in name.split('/')),
+            'file path must stay inside the export directory')
+    require(isinstance(checksum, str) and HASH.fullmatch(checksum) is not None
+            and integer(size, 1), 'invalid file checksum or byte count')
+    path = (folder / name).resolve()
+    require(path.is_relative_to(folder.resolve()) and path.is_file(),
+            'file is missing or escapes the export directory')
+    raw = path.read_bytes()
+    require(len(raw) == size and hashlib.sha256(raw).hexdigest() == checksum,
+            'file integrity mismatch: ' + name)
+    return raw
+
+
+def validate_manifest(manifest, expected):
+    require(isinstance(manifest, dict) and manifest.get('format') == 'micove-estimate-catalogue'
+            and manifest.get('version') == 1, 'unsupported manifest format')
+    require(all(k in expected and manifest.get(k) == expected[k] for k in IDENTITY_FIELDS),
+            'dataset identity differs from the reviewed population')
+    n = manifest['sampleCount']
+    require(integer(n, 1) and text(manifest.get('revision')), 'missing count or revision')
+    categories = indexed(manifest.get('categories'), 'category')
+    geometries = indexed(manifest.get('geometries'), 'geometry')
+    features = indexed(manifest.get('features'), 'feature')
+    raw_series = indexed(manifest.get('series'), 'series')
+    defaults = manifest.get('seriesDefaults', {})
+    require(isinstance(defaults, dict) and set(defaults) <= SERIES_DEFAULT_FIELDS,
+            'unknown series default')
+    series = {key: {**defaults, **item} for key, item in raw_series.items()}
+    shards = indexed(manifest.get('shards'), 'shard')
+    require(bool(categories and geometries and features and series and shards), 'empty catalogue')
+    for category in categories.values():
+        require(text(category.get('label')) and text(category.get('description')),
+                'category needs a label and description')
+    for geometry in geometries.values():
+        require(all(text(geometry.get(k)) for k in ('label', 'normalization', 'distance')),
+                'geometry needs normalization and distance definitions')
+    transformations = {}
+    for feature in features.values():
+        require(feature.get('categoryId') in categories, 'unknown feature category')
+        require(all(text(feature.get(k)) for k in ('label', 'description', 'unit'))
+                and feature.get('valueType') in ('continuous', 'binary'), 'incomplete feature definition')
+        if 'featureIndex' in feature:
+            require(integer(feature['featureIndex']) and feature['featureIndex'] < expected['featureCount'],
+                    'taxon feature index is outside the dictionary')
+        transforms = indexed(feature.get('transformations'), 'transformation')
+        require(bool(transforms), 'feature has no transformations')
+        for transform in transforms.values():
+            require(all(text(transform.get(k)) for k in
+                        ('label', 'formulaTex', 'description', 'outputUnit', 'zeroPolicy'))
+                    and isinstance(transform.get('parameters'), dict),
+                    'incomplete transformation definition')
+        transformations[feature['id']] = transforms
+    statuses = dict(STATUS_CODES)
+    extra = manifest.get('statusCodes', {})
+    require(isinstance(extra, dict) and all(text(k) and text(v) for k, v in extra.items()),
+            'invalid status definitions')
+    require(not any(k in statuses and v != statuses[k] for k, v in extra.items()),
+            'built-in status meaning cannot be changed')
+    statuses.update(extra)
+    policies = {key: estimation_policy(policy) for key, policy in
+                indexed(manifest.get('estimationPolicies', []), 'estimation policy').items()}
+    assignments = indexed(manifest.get('anchorAssignments', []), 'anchor assignment')
+    for key in assignments:
+        checksum = expected.get('anchorOrderSha256', {}).get(key)
+        require(isinstance(checksum, str) and HASH.fullmatch(checksum) is not None,
+                'anchor assignment needs an independently reviewed order hash')
+    if assignments:
+        require(integer(expected.get('featureCount'), 1), 'anchor assignments need a feature count')
+    scopes = indexed(manifest.get('scopes', []), 'scope')
+    require('all' not in scopes, 'all is a reserved scope ID')
+    for scope in scopes.values():
+        require(text(scope.get('description')), 'scope needs a description')
+        if scope.get('type') == 'query-anchor':
+            require(scope.get('anchorAssignmentId') in assignments
+                    and type(scope.get('excludeFeatureAnchor')) is bool,
+                    'invalid query-anchor scope')
+            continue
+        require(scope.get('type', 'records') == 'records', 'unknown scope type')
+        indices = scope.get('recordIndices')
+        require(isinstance(indices, list)
+                and all(integer(i) and i < n for i in indices)
+                and len(set(indices)) == len(indices), 'invalid scope membership')
+    support = manifest.get('supportDefinitions', {})
+    require(isinstance(support, dict) and all(text(k) and text(v) for k, v in support.items()),
+            'invalid support definitions')
+    combinations = set()
+    for item in series.values():
+        require(item.get('featureId') in features and item.get('geometryId') in geometries
+                and item.get('shardId') in shards, 'unknown series feature, geometry or shard')
+        require(item.get('transformationId') in transformations[item['featureId']],
+                'unknown series transformation')
+        require(item.get('scopeId') == 'all' or item.get('scopeId') in scopes, 'undefined series scope')
+        require(all(text(item.get(k)) for k in
+                    ('estimatorId', 'estimatorLabel', 'resultKind', 'quantityLabel', 'unit')),
+                'incomplete series description')
+        require(integer(item.get('k'), 1) and item.get('kMeaning') in ('neighbors', 'case_participants'),
+                'k needs a positive integer and an explicit counting unit')
+        require(item.get('valueDomain') in ('probability', 'nonnegative', 'real'), 'unknown value domain')
+        if 'referenceValue' in item:
+            require(number(item['referenceValue']) and text(item.get('referenceLabel')),
+                    'reference value needs a finite value and label')
+        if 'estimationId' in item:
+            require('estimation' not in item and item['estimationId'] in policies,
+                    'unknown or ambiguous estimation policy')
+            item['estimation'] = policies[item['estimationId']]
+        item['estimation'] = estimation_policy(item.get('estimation', {}))
+        counts = item.get('counts', {})
+        require(isinstance(counts, dict) and all(integer(counts.get(k)) for k in
+                ('trainingObservations', 'queryCount', 'availableEstimateCount'))
+                and counts['availableEstimateCount'] <= counts['queryCount'] <= n,
+                'invalid series counts')
+        for field in ('trainingParticipants', 'positiveObservations', 'positiveParticipants'):
+            if field in counts:
+                require(counts[field] is None or integer(counts[field]), 'invalid count: ' + field)
+        for smaller, larger in (('trainingParticipants', 'trainingObservations'),
+                                ('positiveObservations', 'trainingObservations'),
+                                ('positiveParticipants', 'trainingParticipants')):
+            if counts.get(smaller) is not None and counts.get(larger) is not None:
+                require(counts[smaller] <= counts[larger], 'inconsistent training/case counts')
+        key = tuple(item[k] for k in ('featureId', 'transformationId', 'geometryId', 'estimatorId',
+                                     'k', 'scopeId', 'resultKind'))
+        require(key not in combinations, 'ambiguous duplicate selector combination')
+        combinations.add(key)
+        scope = scopes.get(item['scopeId'], {})
+        if scope.get('type') == 'query-anchor' and scope['excludeFeatureAnchor']:
+            require(integer(features[item['featureId']].get('featureIndex')),
+                    'query-anchor exclusion needs the target taxon feature index')
+    require(set(shards) == {s['shardId'] for s in series.values()}, 'unreferenced shard')
+    return dict(series=series, shards=shards, statuses=statuses, scopes=scopes, support=support,
+                features=features, assignments=assignments)
+
+
+def load_anchors(folder, manifest, expected, context):
+    """Check query-dependent scopes without recomputing states or fitting models."""
+    anchors = {}
+    for key, descriptor in context['assignments'].items():
+        data = read_json(checked_file(folder, descriptor))
+        require(isinstance(data, dict) and data.get('datasetId') == manifest['datasetId']
+                and data.get('sampleOrderSha256') == manifest['sampleOrderSha256'],
+                'anchor assignment identity differs')
+        ids = data.get('anchorFeatureIds')
+        require(isinstance(ids, list) and len(ids) == manifest['sampleCount']
+                and all(i is None or integer(i, 1) and i <= expected['featureCount'] for i in ids),
+                'invalid anchor feature IDs')
+        # The literal string "null" preserves missing anchors in the ordered hash.
+        require(order_hash(['null' if i is None else str(i) for i in ids])
+                == expected['anchorOrderSha256'][key], 'anchor order differs from reviewed assignments')
+        anchors[key] = ids
+    return anchors
+
+
+def query_scope(metadata, context):
+    if metadata['scopeId'] == 'all':
+        return None
+    scope = context['scopes'][metadata['scopeId']]
+    if scope.get('type') != 'query-anchor':
+        return set(scope['recordIndices'])
+    excluded = (context['features'][metadata['featureId']]['featureIndex'] + 1
+                if scope['excludeFeatureAnchor'] else None)
+    return {i for i, anchor in enumerate(context['anchors'][scope['anchorAssignmentId']])
+            if anchor is not None and anchor != excluded}
+
+
+def validate_shard(shard, descriptor, manifest, context):
+    require(isinstance(shard, dict) and shard.get('format') == 'micove-estimate-shard'
+            and shard.get('version') == 1, 'unsupported shard format')
+    require(shard.get('datasetId') == manifest['datasetId']
+            and shard.get('catalogueRevision') == manifest['revision']
+            and shard.get('sampleOrderSha256') == manifest['sampleOrderSha256'],
+            'shard identity differs')
+    rows = shard.get('series')
+    selected = {k: v for k, v in context['series'].items() if v['shardId'] == descriptor['id']}
+    require(isinstance(rows, dict) and set(rows) == set(selected), 'shard series inventory differs')
+    n = manifest['sampleCount']
+    for key, metadata in selected.items():
+        row = rows[key]
+        require(isinstance(row, dict) and set(row) <= {'values', 'status', 'support'},
+                'unexpected fields in estimate row')
+        values, statuses = row.get('values'), row.get('status')
+        require(isinstance(values, list) and isinstance(statuses, list)
+                and len(values) == len(statuses) == n, 'estimate/status array length differs')
+        scope = query_scope(metadata, context)
+        for i, (value, status) in enumerate(zip(values, statuses)):
+            require(isinstance(status, str) and status in context['statuses'], 'undefined status code')
+            require((number(value) if status == 'ok' else value is None), 'value/status mismatch')
+            if scope is not None and i not in scope:
+                require(status == 'outside_scope', 'estimate outside declared scope')
+            if status == 'ok':
+                domain = metadata['valueDomain']
+                require(domain != 'probability' or 0 <= value <= 1, 'probability outside [0, 1]')
+                require(domain != 'nonnegative' or value >= 0, 'negative value in nonnegative field')
+        require(statuses.count('ok') == metadata['counts']['availableEstimateCount'],
+                'available-estimate count differs')
+        arrays = row.get('support', {})
+        require(isinstance(arrays, dict) and set(arrays) <= set(context['support']),
+                'support arrays need definitions')
+        for name, array in arrays.items():
+            require(isinstance(array, list) and len(array) == n, 'support array length differs')
+            require(all(v is None or (number(v) and v >= 0) for v in array), 'invalid support value')
+            if name in ('neighborCount', 'participantCount', 'caseParticipantCount'):
+                require(all(v is None or integer(v) for v in array), 'support count is not an integer')
+            require(all(v is None for v, status in zip(array, statuses)
+                        if status in ('unknown_participant', 'outside_scope')),
+                    'support must be null outside scope or without participant identity')
+        for smaller, larger in (('caseParticipantCount', 'participantCount'),
+                                ('participantCount', 'neighborCount')):
+            if smaller in arrays and larger in arrays:
+                require(all(a is None or b is None or a <= b
+                            for a, b in zip(arrays[smaller], arrays[larger])),
+                        'inconsistent support counts')
+    return len(selected)
+
+
+def load_catalogue(folder, expected):
+    """Check all assets while retaining only the small catalogue in memory."""
+    folder = Path(folder)
+    manifest = read_json((folder / 'manifest.json').read_bytes())
+    context = validate_manifest(manifest, expected)
+    sample_order = read_json(checked_file(folder, manifest.get('sampleOrder')))
+    ids = sample_order.get('sampleIds') if isinstance(sample_order, dict) else None
+    require(isinstance(ids, list) and all(text(s) for s in ids) and len(ids) == manifest['sampleCount']
+            and len(set(ids)) == len(ids) and order_hash(ids) == manifest['sampleOrderSha256'],
+            'sample order or identities differ')
+    context['anchors'] = load_anchors(folder, manifest, expected, context)
+    count = 0
+    for descriptor in context['shards'].values():
+        count += validate_shard(read_json(checked_file(folder, descriptor)), descriptor, manifest, context)
+    return manifest, dict(samples=len(ids), features=len(manifest['features']),
+                          series=count, shards=len(context['shards']))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('catalogue', type=Path)
+    parser.add_argument('--identity', type=Path, required=True,
+                        help='Trusted identity receipt for the existing dataset, not supplied by the catalogue')
+    args = parser.parse_args()
+    _, summary = load_catalogue(args.catalogue, read_json(args.identity.read_bytes()))
+    print(json.dumps(dict(passed=True, **summary)))

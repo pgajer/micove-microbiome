@@ -589,6 +589,31 @@ do not override the independent sample Color by choice. Graph selection follows
 the current assignment checkbox and retained cores, while coloring alone changes
 no membership. Unknown genus assignments retain their explicit higher-rank labels.
 
+### Separately supplied exploratory estimate catalogues
+
+An installed LSVF estimate catalogue adds Phylotypes, Metabolites, Immune markers,
+Bacterial load and Clinical metadata choices to **Color by**, each labeled
+“estimates”. Dependent target, transformation, estimator and neighborhood-size
+controls appear in the sample sidebar. Only saved combinations are offered.
+These fields exclude the query participant and use their declared original-space
+distance, independently of the selected display embedding. They do not change
+state membership, selections, graph structure, references or coordinates.
+
+Viridis spans the 2.5th–97.5th percentiles of the full selected estimate field by
+default (linear interpolation). **Limit colors to central 95%** can be unchecked
+to use the full finite range. Limits stay fixed across selections and embeddings;
+only colors are clipped, while hover values and CSV downloads retain the original
+values. Zero remains a valid value. Undefined estimates use gray `#9ca3af`, with
+their reasons in the legend and hover text. Existing gray background/dimming
+controls take precedence; reference vertices retain their own appearance.
+
+Binary fields show percentages but are not necessarily disease probabilities:
+for example, assay reporting is conditional on assay availability. The methods
+dialog and feature descriptions retain measurement, imputation and sampling
+limitations. The first five-feature integration catalogue is explicitly a pilot;
+its full illustrated report is pending. Preferences are stored by dataset and
+catalogue revision. See [catalogue format](rank2_feature_graph/ESTIMATE_CATALOGUE.md).
+
 ### AGP outcome probability colors
 
 AGP's **Color by** dropdown is in **Sample coloring** in the sample panel's right

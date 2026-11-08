@@ -118,6 +118,7 @@ function renderCountedSampleLegend(){
  }
  const eligible=entries.filter(e=>population.identities.has(e.key)),nonCore=pureCoverageActive()&&pureCoverageComparison.nonCore;
  if(typeof renderCstSphereSummary==='function')renderCstSphereSummary(eligible,population);
+ if(typeof estimateRenderLegend==='function'&&estimateRenderLegend(eligible))return;
  const valencia=valenciaActive()&&!nonCore,triples=!isParticipant&&!nonCore&&!valencia&&rank3.enabled&&rank3.color==='rank3';
  const components=!isParticipant&&!!mergedComponentKey(),candidates=!isParticipant&&candidateActive();
  const reference=new Map(displayGraph(bundle.data.graphs['100'],bundle.data).edges.map(e=>[e.id,e])),displayed=new Map(current().edges.map(e=>[e.id,e]));

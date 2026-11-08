@@ -732,9 +732,11 @@ let sampleRevision=0;function refreshSamples(camera=null){
  const revision=++sampleRevision;setEmbeddingStress('sampleStress',null,'Calculating the current embedding diagnostic.');el('sampleStress').textContent='RMS relative error: calculating…';
  queue=queue.then(async()=>{
   if(revision!==sampleRevision)return;
+  if(typeof estimateEnsure==='function')await estimateEnsure();
+  if(revision!==sampleRevision)return;
   // samples() synchronously normalizes participant embedding controls before rendering.
   const rendering=samples(),key=sampleViewKey();await rendering;sampleRenderedKey=key;
-  if(revision===sampleRevision){renderValenciaLegend();renderCountedSampleLegend();renderSampleStress();}
+  if(revision===sampleRevision){if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();renderValenciaLegend();renderCountedSampleLegend();renderSampleStress();}
   if(revision===sampleRevision&&camera)await Plotly.relayout('samples',{'scene.camera':copyCamera(camera)});
   if(revision===sampleRevision)pendingSampleCamera=null;
  }).catch(e=>{el('sampleStatus').textContent='Sample view error: '+e.message;console.error(e)});return queue;

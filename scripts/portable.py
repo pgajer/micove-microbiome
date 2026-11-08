@@ -509,7 +509,8 @@ def app_destination(output=None):
 
 
 def update(package=None, metadata_path=None, output=None, neighborhood_package=None, neighborhood_metadata=None,
-           catalog=None, datasets=None, select_datasets=False, agp_population=None, skin_exchanges=None, skin_states=None):
+           catalog=None, datasets=None, select_datasets=False, agp_population=None, skin_exchanges=None, skin_states=None,
+           estimate_catalogues=None):
     output = app_destination(output)
     # Reject the source checkout before creating any locks or staging folders.
     if output == ROOT or output in ROOT.parents or ROOT in output.parents:
@@ -609,6 +610,20 @@ def update(package=None, metadata_path=None, output=None, neighborhood_package=N
                 receipt = json.loads(receipt_path.read_text())
                 receipt['skinStates'] = str(states_path)
                 receipt_path.write_text(json.dumps(receipt, indent=2)+'\n')
+            estimate_catalogues = estimate_catalogues if estimate_catalogues is not None else old_receipt.get('estimateCatalogues')
+            if estimate_catalogues:
+                from estimate_supplement import attach as attach_estimates
+                paths = [Path(path).expanduser().resolve() for path in estimate_catalogues]
+                if any(output == path or output in path.parents or path in output.parents for path in paths):
+                    raise ValueError('Keep estimate catalogue data outside the app folder')
+                for path in paths:
+                    digest = attach_estimates(candidate/'web/index.html', path)
+                    if digest:
+                        extend_instance(candidate, 'estimate-catalogue', digest)
+                receipt_path = candidate/'SOURCE_AND_DATA.json'
+                receipt = json.loads(receipt_path.read_text())
+                receipt['estimateCatalogues'] = list(map(str, paths))
+                receipt_path.write_text(json.dumps(receipt, indent=2)+'\n')
             validate_prepared(candidate)
             # Write recovery information before either directory is moved.
             with journal.open('x') as stream:
@@ -652,11 +667,13 @@ def main():
     item.add_argument('--agp-population', type=Path, help='Reviewed AGP SILVA population file (remembered locally)')
     item.add_argument('--skin-exchange', nargs='+', type=Path, help='Registered skin v2 exchange directories (remembered locally)')
     item.add_argument('--skin-states', type=Path, help='Reviewed skin genus-state sidecar directory (remembered locally)')
+    item.add_argument('--estimate-catalogue', nargs='+', type=Path, help='Reviewed exploratory estimate directories (remembered locally)')
     args = parser.parse_args()
     try:
         if args.command == 'update':
             update(args.package, args.metadata, args.output, args.neighborhood_package, args.neighborhood_metadata,
-                   args.catalog, args.datasets, args.select_datasets, args.agp_population, args.skin_exchange, args.skin_states)
+                   args.catalog, args.datasets, args.select_datasets, args.agp_population, args.skin_exchange, args.skin_states,
+                   args.estimate_catalogue)
         elif args.command == 'prepare':
             prepare(args.package.resolve(), args.metadata.resolve(), args.output.resolve())
         else:

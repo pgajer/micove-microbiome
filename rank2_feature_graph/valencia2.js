@@ -9,6 +9,7 @@ function sampleMergedColors(){return sampleColorBundle()?.cohortAnalysis?.merged
 function sampleColorMode(){return el('sampleColorScheme').value||'default'}
 function sampleColorTitle(){
  const mode=sampleColorMode();
+ if(typeof estimateActive==='function'&&estimateActive())return estimateSelection()?.quantityLabel||'Exploratory estimates';
  return mode==='default'?el('coverage').value+'% 2-CSTs':mode==='pure'?'Pure 2-CSTs':mode==='cohorts'?'Cohorts':mode==='visits'?'Visit colors':mode==='rank3'?'Top-3 CSTs':mode==='valencia2-subtype'?'VALENCIA2 subCSTs':'VALENCIA2 CSTs';
 }
 function valenciaUnavailableReason(){
@@ -16,6 +17,7 @@ function valenciaUnavailableReason(){
  return 'VALENCIA2 is unavailable: verified annotations have not been supplied for this dataset. Install its VALENCIA2 supplement.';
 }
 function sampleColorHelp(){
+ if(typeof estimateActive==='function'&&estimateActive())return 'Exploratory participant-excluded estimates in original L1-normalized Euclidean space. Select a target and neighborhood size in the sample sidebar. Colors change; samples, selections and coordinates do not.';
  if(sampleColorMode().startsWith('valencia2-')&&!valenciaAsset())return valenciaUnavailableReason();
  const help={default:'Color by merged 2-CST group at the chosen dataset coverage. This percentage does not describe taxon abundance.',pure:'Original, unmerged top-two-taxa assignments. Pure does not mean that a sample contains only two taxa.',cohorts:'Recorded cohort membership. Missing metadata is Unclassified. A composition shared across cohorts is labeled Multiple cohorts when records are represented by a single point.',visits:'Participant visit labels or order. Available during a participant trajectory; background samples retain their state colors or gray background setting.',rank3:'Original top-three-taxa assignments; coloring does not change the selected samples.', 'valencia2-cst':'Saved VALENCIA2 CST annotations; no classifications are recalculated.','valencia2-subtype':'Saved VALENCIA2 subCST annotations; no classifications are recalculated.'};
  return (help[sampleColorMode()]||help.default)+(sampleColorMode().startsWith('valencia2-')?' The graph panel summarizes displayed CST sizes. Samples and coordinates stay unchanged.':' Only colors change.');
@@ -47,6 +49,7 @@ function sampleColorCategory(index,record=null,profile=null,{background=false}={
  const bundle=sampleColorBundle();if(!bundle)return null;
  record=record||DATA.records?.[index];profile=profile??record?.profile??index;
  const mode=sampleColorMode(),pure=bundle.data.samples.pair[profile];
+ if(typeof estimateActive==='function'&&estimateActive())return {id:null,color:estimatePointColor(index,record,profile)};
  if(mode==='cohorts'){
   const model=sampleCohortModel(),r=record?model.byId.get(record.id)||record:null,cohorts=model.byProfile.get(profile);
   const id=r?(r.cohort||null):cohorts?.size===1?[...cohorts][0]:cohorts?.size>1?'Multiple cohorts':null;
@@ -67,6 +70,7 @@ function syncSampleColorOptions(){
  if(!sampleColorBundle())return;
  const select=el('sampleColorScheme'),merged=!!sampleMergedColors(),available=!!valenciaAsset();
  const options=[['default',el('coverage').value+'% 2-CSTs',merged],['pure','Pure 2-CSTs',true],['cohorts','Cohorts',true],['visits','Visit colors',participant.active],['rank3','Top-3 CSTs',rank3.enabled],['valencia2-cst','VALENCIA2 CSTs',available],['valencia2-subtype','VALENCIA2 subCSTs',available]];
+ if(typeof estimateSyncOptions==='function')options.push(...estimateSyncOptions());
  for(const [value,label,enabled] of options){const option=Array.from(select.options).find(o=>o.value===value);if(option){const valencia=value.startsWith('valencia2-');option.textContent=label+(valencia&&!enabled?' (unavailable)':'');option.disabled=!enabled;option.hidden=!enabled&&value!=='default'&&!valencia}}
  if(!options.some(([value,,enabled])=>enabled&&value===select.value))select.value=merged?'default':'pure';
  select.title=sampleColorHelp()+(available?'':' '+valenciaUnavailableReason());
@@ -77,11 +81,17 @@ function syncSampleColorOptions(){
  el('participantColorBy').disabled=!participant.active||!legacy;
  if(legacy){el('participantColorBy').value=legacy;el('participantColorBy').options[2].disabled=!merged}
  el('participantColorBy').title='The same coloring choice as Color by above. Use Color by for Cohorts or VALENCIA2.';
+ if(typeof estimateSyncControls==='function')estimateSyncControls();
 }
+let sampleRecolorRevision=0;
 async function recolorSampleView(){
  // Wait for an in-flight selection render, then update only marker colors.
+ const revision=++sampleRecolorRevision;
  if(typeof queue!=='undefined')await queue;
+ if(revision!==sampleRecolorRevision)return;
  syncSampleColorOptions();
+ if(typeof estimateEnsure==='function'&&!await estimateEnsure())return;
+ if(revision!==sampleRecolorRevision)return;
  const plot=el('samples'),records=typeof participantData==='function'?participantData()?.records:[],byIndex=new Map((records||[]).map(r=>[r.index,r]));
  for(let k=0;k<(plot.data||[]).length;k++){
   const trace=plot.data[k];if(!trace.mode?.includes('markers')||trace.meta?.edgeFaceRings)continue;
@@ -94,7 +104,9 @@ async function recolorSampleView(){
    colors=participant.sampleColors===false?'#a8adb2':trace.ids.map((id,j)=>samplePaletteColor(Number(id),Array.isArray(trace.marker.color)&&['#93b3c1','#d5dce0'].includes(trace.marker.color[j])?trace.marker.color[j]:'#7c878d'));
   }else continue;
   await Plotly.restyle(plot,{'marker.color':[colors]},[k]);
+  if(revision!==sampleRecolorRevision)return;
  }
+ if(typeof estimateDecorateTraces==='function')await estimateDecorateTraces();
  syncValenciaControls();renderCountedSampleLegend();
  if(typeof sampleRenderedKey!=='undefined')sampleRenderedKey=sampleViewKey();
  if(typeof saveDatasetPanelSettings==='function')saveDatasetPanelSettings();

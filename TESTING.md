@@ -71,6 +71,14 @@ produce a partial full-pass result. Prepared participant summaries and bundled
 neighborhoods are optional and their availability is reported in the result.
 Separately linked neighborhoods are not audited by this command.
 
+The shared-viewer integration harness requires bundle-format datasets. AGP and
+skin population viewers use separate adapters and dedicated tests; an installation
+containing those entries cannot currently be passed wholesale to this legacy
+harness. For a shared-viewer change, prepare a test installation with the four
+required datasets and the affected bundle-format dataset (for example LSVF).
+Do not alter scientific checksums or dataset identities to make the harness pass.
+
+
 When SANTE is installed, integration also checks its 953 admitted samples,
 325 participants, verified analyzed depths, control exclusion and unavailable
 VALENCIA2 annotations, plus representative local and participant joint views

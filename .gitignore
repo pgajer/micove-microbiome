@@ -145,3 +145,10 @@
 !/scripts/vme-test
 !/scripts/vme-test-audit
 !/scripts/vme-test-layout
+!/rank2_feature_graph/estimate_catalogue.py
+!/rank2_feature_graph/test_estimate_catalogue.py
+!/rank2_feature_graph/estimate_colors.js
+!/rank2_feature_graph/test_estimate_colors.mjs
+!/rank2_feature_graph/ESTIMATE_CATALOGUE.md
+!/scripts/estimate_supplement.py
+!/scripts/test_estimate_supplement.py
