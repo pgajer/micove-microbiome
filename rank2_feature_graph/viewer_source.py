@@ -20,6 +20,7 @@ def assemble_viewer(here, *, pack, plotly, palette, legend_abundance, overlap_av
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'sensitivity_views.js').read_text() + '\n' + (here/'max_normalized_views.js').read_text() + '\n' + (here/'unfolded_views.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'valencia2.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_colors.js').read_text()
+    replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_cluster_profiles.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_correlation_compute.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_correlation_clustering.js').read_text()
     replacements['COHORT_CONTROLLER'] += '\n' + (here/'estimate_correlation_layout.js').read_text()

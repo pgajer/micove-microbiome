@@ -329,3 +329,9 @@ update command. The browser integration test above also recognizes the new pair.
 Optional correlation-graph weighted-GRIP service: see [GRAPH_LAYOUTS.md](GRAPH_LAYOUTS.md)
 for the focused JavaScript, HTTP and real-R tests. These run only on demand and
 are not part of installation or updating.
+
+Joint cluster profiles: run `node rank2_feature_graph/test_estimate_cluster_profiles.mjs`
+on demand after changes to cluster coloring or its reference weights. It checks
+ties, repeated participants, missing support, pinned definitions and color-only
+updates. Pair it with the estimate-color and correlation tests, then inspect
+LSVF in the browser. These checks remain outside the update command.

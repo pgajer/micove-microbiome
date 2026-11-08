@@ -1,0 +1,44 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const elements=new Map(),el=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:'',hidden:false,options:[]});return elements.get(id)};
+const input={recordIndices:[0,1,2],participantGroups:['A','A','B'],featureIds:['f','g','h'],valuesBase64:Buffer.from(new Float64Array([0,10,20,30,20,10,0,0,2]).buffer).toString('base64')};
+const fields=input.featureIds.map((featureId,i)=>({featureId,label:featureId,categoryId:i<2?'immune':'metabolite',transformationLabel:'Saved transform'}));
+const records=['a','b','c','d'].map((id,index)=>({id,index,profile:index}));
+const asset={datasetId:'test',revision:'v1',sampleIds:records.map(r=>r.id),sampleCount:4,features:[],series:[],categories:[{id:'immune',label:'Immune'},{id:'metabolite',label:'Metabolites'}],correlations:{revision:'r1',fields},statusCodes:{}};
+const plot={data:[{mode:'markers',meta:{sampleView:true},ids:['0','1','2','3'],x:[1,2,3,4],y:[4,3,2,1],z:[0,1,0,1],marker:{color:['red','blue','red','blue']},text:['a','b','c','d']},{mode:'markers',meta:{reference:true},x:[5],y:[5],z:[5],marker:{color:'red'}}],layout:{scene:{camera:{eye:{x:2,y:3,z:1}}}}};elements.set('samples',plot);
+const saved=new Map(),selection={vertex:4,edge:null};
+const context={console,atob,Uint8Array,Float64Array,DataView,Map,WeakMap,Set,Math,Number,Array,String,JSON,Object,el,input,asset,selection,esc:String,
+ META:{id:'test'},BUNDLE_PACK:{estimateCatalogues:{test:asset},participants:{test:{records}}},DATA:{records},sampleColorMode:()=>el('sampleColorScheme').value,
+ localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},participant:{sampleColors:true},participantData:()=>({records}),datasetRegistry:new Map([['test',{data:{samples:{pair:['a','b','c','d']}}}]]),renderCountedSampleLegend(){},
+ Plotly:{restyle:async(p,updates,indices)=>{for(const i of indices)for(const [key,v]of Object.entries(updates))if(key.startsWith('marker.'))p.data[i].marker[key.slice(7)]=v[0];else p.data[i][key]=key==='hovertext'?v[0]:v}}};
+vm.createContext(context);for(const f of ['valencia2.js','estimate_colors.js','estimate_correlations.js','estimate_cluster_profiles.js'])vm.runInContext(fs.readFileSync(new URL(f,import.meta.url),'utf8'),context);
+const run=s=>vm.runInContext(s,context),plain=v=>JSON.parse(JSON.stringify(v));
+assert.deepEqual(plain(run('jointProfileScores(input,[0],4).values')),[12.5,37.5,75,null]);
+assert.deepEqual(plain(run('jointProfileScores(input,[2],4).values')),[25,25,75,null]);
+assert.deepEqual(plain(run('jointProfileScores(input,[0,1],4).values')),[50,50,50,null]);
+assert.deepEqual(plain(run('jointProfileScores(input,[0,2],4).values')),[18.75,31.25,75,null]);
+assert.equal(run('jointProfileScores(input,[0],4).referenceParticipants'),2);
+assert.equal(run('jointProfileScores(input,[0],4).status[3]'),'no_joint_support');
+context.invalid={...input,valuesBase64:Buffer.from(new Float64Array([NaN,10,20,30,20,10,0,0,2]).buffer).toString('base64')};
+assert.throws(()=>run('jointProfileScores(invalid,[0],4)'),/finite/);
+const view={asset,data:asset.correlations,bank:{featureIndices:[0,1,2],records:3,participants:2},labels:[1,0,1],representatives:new Map([[1,{label:'C1 · [f]'}]]),state:{k:40,unit:'participants',method:'spearman',clustering:'dynamic',minSize:2,deepSplit:1},scope:{key:'full',label:'Full reference'}};context.view=view;
+run('const snap=jointProfileSnapshot(view);const jp=jointProfileModel();jp.snapshot=snap;jp.chosen=1;jointProfileSave();jointProfileInputs.set(asset,new Map([[40,input]]));');
+assert.deepEqual(plain(run('jp.snapshot.clusters[0].members')),[0,2]);
+assert.match(run('jointProfileGroupCounts(jp.snapshot.clusters[0])'),/Immune: 1.*Metabolites: 1/);
+view.labels=[2,2,3];view.state.k=10;view.scope.label='New selection';
+assert.deepEqual(plain(run('jp.snapshot.clusters[0].members')),[0,2]);assert.equal(run('jp.snapshot.settings.k'),40);
+assert.match(run('jointProfileDescription()'),/participant means.*each visit retains its own profile/);
+run('syncSampleColorOptions=()=>{};syncValenciaControls=()=>{};syncEstimateCorrelationPanel=undefined;jointProfileSync=()=>{}');
+el('sampleColorScheme').value='joint-clusters';const before=JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.text,t.meta]),camera:plot.layout.scene});
+await run('recolorSampleView()');
+assert.equal(run('estimateSelection().joint'),true);assert.equal(run('estimateCurrent().row.values[0]'),18.75);
+assert.equal(plot.data[0].marker.color[3],'#9ca3af');assert.equal(plot.data[1].marker.color,'red');assert.match(plot.data[0].hovertext[0],/Median feature percentile: 18.75/);
+assert.equal(before,JSON.stringify({selection,coords:plot.data.map(t=>[t.x,t.y,t.z,t.text,t.meta]),camera:plot.layout.scene}));
+const first=run('jointProfileSeries()');assert.equal(run('jointProfileSeries()'),first);
+const values=JSON.stringify(run('estimateCurrent().row.values'));selection.vertex=8;await run('recolorSampleView()');assert.equal(JSON.stringify(run('estimateCurrent().row.values')),values);
+run('delete estimateModel().jointProfiles');assert.equal(run('jointProfileModel().chosen'),1);assert.equal(run('jointProfileModel().snapshot.settings.k'),40);
+let exported;context.heatmapZip=async files=>{exported=files;return 'zip'};run('estimateDownload=()=>{}');await run('jointProfileExport()');
+assert.equal(exported.length,2);assert.match(exported[0].text,/18.75/);assert.equal(JSON.parse(exported[1].text).features.length,2);
+el('sampleColorScheme').value='pure';await run('estimateEnsure();estimateDecorateTraces()');assert.equal(run('estimateCurrent()'),null);assert.equal(plot.data[0].hovertext,null);
+console.log('PASS: participant weights, ties, even medians, missing support, immutable definitions, persisted snapshots, saved-input aggregation, ZIP provenance, fixed colors across selections and unchanged sample coordinates/camera/reference markers.');

@@ -333,8 +333,9 @@ function estimateCorrelationCluster(bank,s){
 }
 function estimateCorrelationColorSync(s){
  if(!s)return;const mode=sampleColorMode();if(s.lastColor===mode)return;
- s.lastColor=mode;s.open=mode.startsWith('estimate:');
- if(s.open){s.rows=mode.slice(9);s.cols='all';s.cluster='all';s.search=''}estimateCorrelationSave();
+ s.lastColor=mode;s.open=mode.startsWith('estimate:')||mode==='joint-clusters';
+ if(mode.startsWith('estimate:')){s.rows=mode.slice(9);s.cols='all';s.cluster='all';s.search=''}
+ if(mode==='joint-clusters')s.clusteringScope='joint';estimateCorrelationSave();
 }
 function estimateCorrelationClearPlots(){
  estimateCorrelationLayoutCancel();const gallery=el('estimateCorrelationGallery');if(!gallery)return;
@@ -395,7 +396,7 @@ function syncEstimateCorrelationPanel(){
  el('catalogueTitle').textContent=(estimateAsset().categories.find(g=>g.id===s.rows)?.label||'All groups')+' · Estimate correlations';
  // These two existing modes own the same dock; do not change their saved settings.
  el('cataloguePanel').classList.remove('heatmapDocked');
- if(hidden||estimateCorrelationShown?.asset!==estimateAsset()||estimateCorrelationRequestedScope!==estimateCorrelationScope().key||estimateCorrelationShown?.state.rows!==s.rows)requestAnimationFrame(()=>drawEstimateCorrelations().catch(estimateCorrelationError));
+ if(hidden||estimateCorrelationShown?.asset!==estimateAsset()||estimateCorrelationRequestedScope!==estimateCorrelationScope().key||estimateCorrelationShown?.state.rows!==s.rows||estimateCorrelationShown?.state.clusteringScope!==s.clusteringScope)requestAnimationFrame(()=>drawEstimateCorrelations().catch(estimateCorrelationError));
  return true;
 }
 function estimateCorrelationError(error){if(el('estimateCorrelationStatus'))el('estimateCorrelationStatus').textContent='Correlations unavailable: '+error.message;console.error(error)}
@@ -414,6 +415,7 @@ async function drawEstimateCorrelations(){
  el('correlationExport').disabled=true;el('correlationDownload').hidden=true;
  el('estimateCorrelationPair').textContent='Click a heatmap cell to inspect its two fields.';
  el('estimateCorrelationAssignments').replaceChildren();el('estimateCorrelationExcluded').replaceChildren();
+ if(el('jointClusterCatalogue'))el('jointClusterCatalogue').hidden=true;
  estimateCorrelationClearPlots();
  el('estimateCorrelationStatus').textContent=scope.label+' · '+(scope.kind==='selection'?'Loading saved estimate inputs…':'Loading saved correlations…');
  let descriptor,bank;
@@ -446,6 +448,7 @@ async function drawEstimateCorrelations(){
  const rows=order.filter(i=>matches(i)&&(s.rows==='all'||field(i).categoryId===s.rows)&&(!query||(field(i).label+' '+field(i).transformationLabel).toLowerCase().includes(query)));
  const panels=estimateCorrelationPanels(asset,bank,s,order,labels,rows);
  const cols=[...new Set(panels.flatMap(p=>p.cols))],shown={asset,data,bank,descriptor,labels,representatives,groupRepresentatives,rows,cols,panels,clustering,scope,state:{...s}};estimateCorrelationShown=shown;
+ if(typeof jointProfileCatalogue==='function')jointProfileCatalogue(shown);
  const gallery=el('estimateCorrelationGallery');
  for(const [index,p] of panels.entries()){
   if(request!==estimateCorrelationRequest)return;

@@ -462,6 +462,42 @@ never run in the installer or update command.
 
 Focused check: `node rank2_feature_graph/test_estimate_correlation_layout.mjs`.
 
+## Joint cluster catalogue and sample profiles
+
+With **Cluster groups → Jointly**, a catalogue above the heatmaps lists all
+assigned joint clusters, independent of heatmap group, search and cluster filters.
+Each collapsible cluster groups its features by type and shows their transformations.
+Individual feature buttons retain the existing saved-field coloring. **Color 3D
+samples by this cluster** selects the composite; **Color by → Joint clusters**
+provides the same cluster targets and previous/next navigation in the sample sidebar.
+
+The profile is a median of feature percentiles, not a probability. For each
+feature, rank its saved estimates in the full common-support reference at the
+selected K. Give each participant total weight one, split equally over their
+reference visits. A weighted mid-distribution percentile counts all lower values
+plus half the weight of tied values, divided by total weight, multiplied by 100.
+Take the median across member features at each visit (average the central two for
+even counts). Every feature has equal weight; groups with more features influence
+the median more. Signs are not flipped. Opposing patterns may cancel. Availability
+diagnostics are explicitly identified; unassigned and constant fields are excluded.
+
+Cluster membership may come from a graph selection or participant-mean
+correlations. Colors still summarize each visit's own saved estimates using the
+full common-support percentile reference. Visits without common support are gray.
+The chosen membership, K and scale are pinned and saved locally. Exploring graph
+selections or changing heatmap settings does not redefine them. Choose a catalogue
+cluster or press **Use current heatmap clusters** to replace the definition.
+The displayed description records the clustering scope and settings. Color clipping
+at the 2.5th/97.5th percentiles changes only display; profile values remain intact.
+
+**Profile definition…** explains the formulas. **Download profile + definition**
+produces one ZIP containing `profile.csv` (sample IDs, unmodified scores, support
+status) and `definition.json` (membership, transformations, K, clustering settings,
+reference counts, source revisions, sample-order identity and color limits).
+No estimates, assignments or sample embeddings are refitted or changed.
+
+Focused check: `node rank2_feature_graph/test_estimate_cluster_profiles.mjs`.
+
 ### Weighted-GRIP cluster graph layout
 
 **2D weighted GRIP** uses the separately installed R `grip::grip()` engine through

@@ -173,3 +173,7 @@
 !/GRAPH_LAYOUTS.md
 !/rank2_feature_graph/serve_graph_layouts.py
 !/rank2_feature_graph/test_optional_graph_service.py
+
+!/rank2_feature_graph/estimate_cluster_profiles.js
+
+!/rank2_feature_graph/test_estimate_cluster_profiles.mjs

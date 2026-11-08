@@ -3,7 +3,7 @@ const estimateModels=new WeakMap(),estimateHoverBases=new WeakMap();
 const estimateNeutral='#9ca3af';
 let estimateLoaded=null,estimateRequest=0;
 function estimateAsset(){return BUNDLE_PACK.estimateCatalogues?.[META.id]||null}
-function estimateActive(){return !!estimateAsset()&&sampleColorMode().startsWith('estimate:')}
+function estimateActive(){return !!estimateAsset()&&(sampleColorMode().startsWith('estimate:')||sampleColorMode()==='joint-clusters')}
 function estimateModel(asset=estimateAsset()){
  if(!asset)return null;if(estimateModels.has(asset))return estimateModels.get(asset);
  const records=BUNDLE_PACK.participants?.[asset.datasetId]?.records||[],ids=new Map(asset.sampleIds.map((id,i)=>[id,i])),profiles=new Map(),recordIndices=new Map();
@@ -21,6 +21,7 @@ function estimateModel(asset=estimateAsset()){
 function estimateSave(){const m=estimateModel();if(m)try{localStorage.setItem(m.storageKey,JSON.stringify({choices:m.choices,clip:m.clip,relative:m.relative}))}catch{}}
 function estimateSelection(){
  if(!estimateActive())return null;
+ if(sampleColorMode()==='joint-clusters')return jointProfileSeries();
  const m=estimateModel(),category=sampleColorMode().slice(9),rows=m.byCategory.get(category)||[];
  return m.bySeries.get(m.choices[category])||rows[0]||null;
 }
@@ -35,6 +36,7 @@ function estimateColor(value,limits){
 }
 function estimateResponseReference(series){const f=estimateModel()?.features.get(series.featureId);return f?.transformations?.find(t=>t.id===series.transformationId)?.responseReference||null}
 function estimateDisplay(c){
+ if(c.series.joint)return jointProfileDisplay(c);
  const m=estimateModel(),r=estimateResponseReference(c.series),relative=m.relative&&r&&Number.isFinite(r.mean)&&(r.relativeMode==='difference'||r.mean>0),mode=relative?r.relativeMode:'value';
  const convert=v=>!Number.isFinite(v)?null:mode==='ratio'?v/r.mean:mode==='difference'?v-r.mean:v;
  const format=v=>v==null?'Unavailable':mode==='ratio'?Number(v.toPrecision(4)).toLocaleString('en-US',{maximumSignificantDigits:4})+'×':estimateValueText(v,mode==='difference'?{valueDomain:'real'}:c.series);
@@ -50,7 +52,7 @@ function estimateColorbarSpec(c){
  const span=collapsed?Math.max(1,Math.abs(lo))*.01:0;
  return {cmin:lo-span,cmax:hi+span,cauto:false,showscale:true,
   colorscale:collapsed?[[0,estimateColor(0,[0,0])],[1,estimateColor(0,[0,0])]]:estimateViridis.map((color,i)=>[i/(estimateViridis.length-1),color]),
-  colorbar:{title:{text:d.title+'<br>'+(d.mode==='ratio'?'1× = mean':d.mode==='difference'?'0 = mean':c.series.valueDomain==='probability'?'probability (%)':'transformed response')},tickvals:ticks,ticktext,thickness:12,len:.65,x:1,xpad:8,outlinewidth:.5,bgcolor:"white"}};
+  colorbar:{title:{text:d.title+'<br>'+(c.series.joint?'percentile points':d.mode==='ratio'?'1× = mean':d.mode==='difference'?'0 = mean':c.series.valueDomain==='probability'?'probability (%)':'transformed response')},tickvals:ticks,ticktext,thickness:12,len:.65,x:1,xpad:8,outlinewidth:.5,bgcolor:"white"}};
 }
 const estimateScaleBases=new WeakMap(),estimateScaleKeys=['showscale','colorscale','cauto','cmin','cmax','colorbar'];
 async function estimateDrawColorbar(){
@@ -80,9 +82,12 @@ function estimateLimitsCached(c){const clip=estimateModel().clip;if(c.clip!==cli
 function estimateSyncOptions(){
  const select=el('sampleColorScheme'),asset=estimateAsset(),expected=new Set((asset?.categories||[]).map(c=>'estimate:'+c.id));
  for(const option of Array.from(select.options))if(option.value.startsWith('estimate:')&&!expected.has(option.value))option.remove();
- return (asset?.categories||[]).map(category=>{const value='estimate:'+category.id;let option=Array.from(select.options).find(o=>o.value===value);
+ const categories=(asset?.categories||[]).map(category=>({value:'estimate:'+category.id,label:category.label+' · estimates'}));
+ if(asset?.correlations?.selectionInputs)categories.push({value:'joint-clusters',label:'Joint clusters'});
+ for(const option of Array.from(select.options))if(option.value==='joint-clusters'&&!asset?.correlations?.selectionInputs)option.remove();
+ return categories.map(category=>{const value=category.value;let option=Array.from(select.options).find(o=>o.value===value);
   if(!option){option=document.createElement('option');option.value=value;select.appendChild(option)}
-  return [value,category.label+' · estimates',true];
+  return [value,category.label,true];
  });
 }
 function estimateStepTarget(direction){
@@ -117,7 +122,8 @@ function estimateInstall(){
 }
 function estimateSyncControls(){
  if(!estimateAsset()&&!el('estimateControls'))return;estimateInstall();
- const active=estimateActive(),box=el('estimateControls');box.hidden=!active;if(!active)return;
+ if(typeof jointProfileSync==='function')jointProfileSync();
+ const active=estimateActive()&&sampleColorMode()!=='joint-clusters',box=el('estimateControls');box.hidden=!active;if(!active)return;
  const m=estimateModel(),s=estimateSelection();if(!s)return;
  const feature=m.features.get(s.featureId),transform=feature.transformations.find(t=>t.id===s.transformationId);
  let rows=m.byCategory.get(feature.categoryId)||[];
@@ -141,6 +147,7 @@ function estimateFailure(error){if(el('estimateStatus')){el('estimateStatus').te
 async function estimateEnsure(){
  const request=++estimateRequest;
  if(!estimateActive()){estimateLoaded=null;return true}
+ if(sampleColorMode()==='joint-clusters')return jointProfileEnsure(request);
  const m=estimateModel(),s=estimateSelection();if(!s)return false;
  if(estimateCurrent())return true;
  estimateLoaded=null;el('estimateStatus').textContent='Loading estimates…';el('estimateRetry').hidden=true;el('estimateExport').disabled=true;
@@ -164,6 +171,7 @@ function estimateTraceIndices(trace){
  return null;
 }
 function estimateHover(index,c){
+ if(c.series.joint)return '<br><b>'+esc(c.series.label)+'</b><br>Median feature percentile: '+esc(jointProfileDisplay(c).format(c.row.values[index]))+(Number.isFinite(c.row.values[index])?' (unitless, not a probability)':' · no common estimate support');
  const display=estimateDisplay(c),value=c.row.values[index],status=c.row.status[index]||'unmapped',support=c.row.support||{};
  let text='<br><b>'+esc(estimateModel().features.get(c.series.featureId).label)+' · estimate</b><br>'+esc(c.series.quantityLabel)+': '+esc(estimateValueText(value,c.series))+' '+esc(c.series.unit);
  if(display.mode!=='value'&&Number.isFinite(value))text+='<br>'+esc(display.title)+': '+esc(display.format(display.convert(value)));
@@ -189,6 +197,7 @@ async function estimateDecorateTraces(){
 }
 function estimateRenderLegend(entries){
  if(!estimateActive())return false;
+ if(sampleColorMode()==='joint-clusters')return jointProfileLegend(entries);
  const m=estimateModel(),s=estimateSelection(),c=estimateCurrent(),seen=new Set(),counts=new Map();
  for(const e of entries){if(seen.has(e.key))continue;seen.add(e.key);const i=estimateIndex(e.index,e.record,e.profile),status=c?.row.status[i]||'unavailable';counts.set(status,(counts.get(status)||0)+1)}
  let html='<div class="estimateLegend"><strong>'+esc(m.features.get(s.featureId).label)+'</strong><br>'+esc(s.quantityLabel)+'<br>';
