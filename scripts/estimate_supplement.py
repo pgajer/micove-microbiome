@@ -31,6 +31,10 @@ REVIEWED['b697deea8ca3ab3bc961a876fb16940bdf0f726a9e77d2244f39fddc5b61cd3c'] = {
     **REVIEWED['ced1409d8633b388a1707432a6130938190e7de6e06a77fb4c606671ef24536b'],
 }
 
+REVIEWED['5d7678220f60043823b8f86a7d9d06408b46bf1cda6edfabd03afccf56a0423a'] = {
+    **REVIEWED['b697deea8ca3ab3bc961a876fb16940bdf0f726a9e77d2244f39fddc5b61cd3c'],
+}
+
 
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
@@ -107,6 +111,11 @@ def attach(page_path, folder):
         http = publish(read_json(checked_file(folder, descriptor)))
         descriptor['http'] = http
         shards[descriptor['id']] = http
+    correlations = {}
+    for descriptor in packaged.get('correlations', {}).get('banks', []):
+        http = publish(read_json(checked_file(folder, descriptor)))
+        descriptor['http'] = http
+        correlations[descriptor['id']] = http
     # Package checked documentation as JSON so the existing integrity loader can
     # retrieve it on demand; text is rendered without trusting source HTML.
     documents = {}
@@ -125,7 +134,7 @@ def attach(page_path, folder):
     index = publish({'estimateCatalogues': {dataset: packaged}})
     previous = entry.get('estimateAssets', {}).get('index', {}).get('url')
     entry['parts'] = [d for d in entry['parts'] if d['url'] != previous] + [index]
-    entry['estimateAssets'] = dict(index=index, shards=shards, documents=documents)
+    entry['estimateAssets'] = dict(index=index, shards=shards, documents=documents, correlations=correlations)
     encoded = p.encoded(manifest).decode().replace('</', '<\\/')
     page = re.sub(p.PATTERN, lambda _: '<script id="vme-http-manifest" type="application/json">' + encoded + '</script>', page, count=1, flags=re.S)
     with tempfile.NamedTemporaryFile(dir=page_path.parent, delete=False) as stream:

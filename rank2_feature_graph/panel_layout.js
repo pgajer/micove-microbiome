@@ -92,7 +92,7 @@ var selectionPanelLayoutSync=null,cstSummaryPanelLayoutSync=null;
    resizeAgain=false;
    try{
     await Promise.all([queue,graphQueue]);
-    for(const id of ['samples','graph3d','enrollmentHeatmapPlot','heatmapClusterScores']){const plot=document.getElementById(id);if((!maximized||maximized.id===(id==='samples'?'samplePanel':id==='graph3d'?'featurePanel':'cataloguePanel'))&&plot.data&&plot.clientWidth>0&&plot.clientHeight>0&&plot.style.display!=='none'){if(id==='enrollmentHeatmapPlot'&&typeof resizeEnrollmentHeatmap==='function')await resizeEnrollmentHeatmap();else await Plotly.Plots.resize(plot)}}
+    for(const id of ['samples','graph3d','enrollmentHeatmapPlot','heatmapClusterScores','estimateCorrelationPlot']){const plot=document.getElementById(id);if((!maximized||maximized.id===(id==='samples'?'samplePanel':id==='graph3d'?'featurePanel':'cataloguePanel'))&&plot?.data&&plot.clientWidth>0&&plot.clientHeight>0&&plot.style.display!=='none'){if(id==='enrollmentHeatmapPlot'&&typeof resizeEnrollmentHeatmap==='function')await resizeEnrollmentHeatmap();else await Plotly.Plots.resize(plot)}}
     if(refitJointSamplesAfterResize&&(!maximized||maximized.id==='samplePanel')){
      refitJointSamplesAfterResize=false;
      await fitSubjectSamples3d();

@@ -68,6 +68,42 @@ class EstimateCatalogueTests(unittest.TestCase):
     def load(self):
         return load_catalogue(self.root, self.expected)
 
+    def correlation_fixture(self, change=None):
+        bank=dict(format='micove-estimate-correlations', version=1, revision='correlations-1',
+                  datasetId='synthetic', catalogueRevision='catalogue-1',
+                  sampleOrderSha256=self.expected['sampleOrderSha256'], k=2, unit='visits', method='spearman',
+                  records=5, participants=4, featureIndices=[0,1], excluded=[],
+                  correlations=[.3], linkage=[[0,1,.7,2]], order=[0,1])
+        if change:change(bank)
+        self.manifest['correlations']=dict(version=1, revision='correlations-1', records=5, participants=4,
+            fields=[dict(featureId=f['id'], categoryId='assay', transformationId='raw', transformationLabel='Raw',
+                         seriesIds={'2':'series-'+f['id']}) for f in self.manifest['features']],
+            banks=[dict(id='2-visits-spearman',k=2,unit='visits',method='spearman',
+                        **self.descriptor('correlations/bank.json',bank))])
+        self.write()
+
+    def test_correlation_extension_is_additive(self):
+        before=copy.deepcopy(self.shards)
+        self.correlation_fixture()
+        self.load()
+        self.assertEqual(before,self.shards)
+
+    def test_correlation_mismatched_population_rejected(self):
+        self.correlation_fixture(lambda b:b.update(sampleOrderSha256='0'*64))
+        with self.assertRaisesRegex(ValueError,'identity'):self.load()
+
+    def test_correlation_invalid_matrix_rejected(self):
+        self.correlation_fixture(lambda b:b.update(correlations=[1.1]))
+        with self.assertRaisesRegex(ValueError,'matrix'):self.load()
+
+    def test_correlation_missing_exclusion_rejected(self):
+        self.correlation_fixture(lambda b:b.update(featureIndices=[0],correlations=[],linkage=[],order=[0]))
+        with self.assertRaisesRegex(ValueError,'exclusions'):self.load()
+
+    def test_correlation_bad_hierarchy_rejected(self):
+        self.correlation_fixture(lambda b:b.update(linkage=[[0,2,.7,2]]))
+        with self.assertRaisesRegex(ValueError,'children'):self.load()
+
     def reject(self, message):
         self.write()
         with self.assertRaisesRegex(ValueError, message):

@@ -326,6 +326,70 @@ def validate_shard(shard, descriptor, manifest, context):
     return len(selected)
 
 
+def validate_correlations(folder, manifest, context):
+    """Validate the optional, independently versioned descriptive field banks."""
+    item = manifest.get('correlations')
+    if item is None:
+        return
+    require(isinstance(item, dict) and item.get('version') == 1 and text(item.get('revision')),
+            'invalid correlation catalogue')
+    fields, banks = item.get('fields'), item.get('banks')
+    require(isinstance(fields, list) and bool(fields) and isinstance(banks, list) and bool(banks),
+            'empty correlations')
+    features = {f['id']: f for f in manifest['features']}
+    require(len({f.get('featureId') for f in fields}) == len(fields), 'duplicate correlation feature')
+    for f in fields:
+        source = features.get(f.get('featureId'))
+        require(source and source['categoryId'] == f.get('categoryId') and text(f.get('transformationLabel')),
+                'unknown correlation feature/group')
+        for k, series_id in f.get('seriesIds', {}).items():
+            s = context['series'].get(series_id)
+            require(s and s['featureId'] == f['featureId'] and s['transformationId'] == f.get('transformationId')
+                    and s.get('estimatorId') == 'knn' and str(s.get('k')) == k and s.get('scopeId') in ('global', 'all'),
+                    'correlation series differs')
+    identities = set()
+    for descriptor in banks:
+        key = (descriptor.get('k'), descriptor.get('unit'), descriptor.get('method'))
+        require(integer(key[0], 1) and key[1] in ('visits', 'participants') and key[2] in ('spearman', 'pearson')
+                and key not in identities, 'invalid/duplicate correlation bank')
+        identities.add(key)
+        require(all(str(key[0]) in f.get('seriesIds', {}) for f in fields), 'correlation series missing')
+        bank = read_json(checked_file(folder, descriptor))
+        require(bank.get('format') == 'micove-estimate-correlations' and bank.get('version') == 1
+                and bank.get('revision') == item['revision'] and bank.get('catalogueRevision') == manifest['revision']
+                and bank.get('datasetId') == manifest['datasetId']
+                and bank.get('sampleOrderSha256') == manifest['sampleOrderSha256']
+                and (bank.get('k'), bank.get('unit'), bank.get('method')) == key,
+                'correlation identity differs')
+        require(integer(bank.get('records'), 3) and bank['records'] <= manifest['sampleCount']
+                and integer(bank.get('participants'), 3) and bank['participants'] <= bank['records']
+                and bank['records'] == item.get('records') and bank['participants'] == item.get('participants'),
+                'invalid correlation counts')
+        indices, excluded = bank.get('featureIndices'), bank.get('excluded')
+        require(isinstance(indices, list) and all(integer(i) and i < len(fields) for i in indices)
+                and len(indices) == len(set(indices)) and isinstance(excluded, list), 'invalid correlation indices')
+        ex = [f.get('featureIndex') for f in excluded]
+        require(all(integer(i) for i in ex) and len(set(ex)) == len(ex)
+                and not set(indices).intersection(ex) and set(indices + ex) == set(range(len(fields)))
+                and all(text(f.get('reason')) for f in excluded), 'incomplete correlation exclusions')
+        n = len(indices)
+        values, tree, order = bank.get('correlations'), bank.get('linkage'), bank.get('order')
+        require(isinstance(values, list) and len(values) == n * (n-1)//2
+                and all(number(r) and -1 <= r <= 1 for r in values), 'invalid correlation matrix')
+        require(isinstance(order, list) and all(integer(i) for i in order) and sorted(order) == list(range(n)),
+                'invalid correlation order')
+        require(isinstance(tree, list) and len(tree) == max(0, n-1), 'invalid correlation hierarchy')
+        sizes = [1] * n
+        used = set()
+        for row in tree:
+            require(isinstance(row, list) and len(row) == 4 and all(number(v) for v in row), 'invalid linkage row')
+            a, b, distance, size = row
+            require(a == int(a) and b == int(b) and 0 <= a < len(sizes) and 0 <= b < len(sizes)
+                    and a != b and a not in used and b not in used and 0 <= distance <= 2
+                    and size == sizes[int(a)] + sizes[int(b)], 'invalid linkage children')
+            used.update((a, b)); sizes.append(int(size))
+
+
 def load_catalogue(folder, expected):
     """Check all assets while retaining only the small catalogue in memory."""
     folder = Path(folder)
@@ -340,6 +404,7 @@ def load_catalogue(folder, expected):
     count = 0
     for descriptor in context['shards'].values():
         count += validate_shard(read_json(checked_file(folder, descriptor)), descriptor, manifest, context)
+    validate_correlations(folder, manifest, context)
     return manifest, dict(samples=len(ids), features=len(manifest['features']),
                           series=count, shards=len(context['shards']))
 

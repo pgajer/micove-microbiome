@@ -152,3 +152,7 @@
 !/rank2_feature_graph/ESTIMATE_CATALOGUE.md
 !/scripts/estimate_supplement.py
 !/scripts/test_estimate_supplement.py
+
+!/rank2_feature_graph/estimate_correlations.js
+
+!/rank2_feature_graph/test_estimate_correlations.mjs

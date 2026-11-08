@@ -627,6 +627,7 @@ el('exportCatalogue').onclick=()=>{
  a.href=url;a.download=`${META.id}_${activeCohort}_${activeStateMode}_${el('catalogueKind').value||'edges'}_catalogue_${el('coverage').value}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 function table(){
+ if(typeof syncEstimateCorrelationPanel==='function'&&syncEstimateCorrelationPanel())return;
  if(renderLongitudinalHeatmap())return;
  if(syncEnrollmentHeatmapPanel())return;
  syncEdgeFacesControls();if(edgeFacesCatalogue()){renderEdgeFacesTable();return}

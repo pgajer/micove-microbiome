@@ -106,6 +106,7 @@ function estimateInstall(){
  el('estimateMethodsButton').onclick=()=>estimateMethods().catch(estimateFailure);
  el('estimateExport').onclick=estimateExport;
  el('estimateReport').onclick=()=>estimateReport().catch(estimateFailure);
+ const correlations=document.createElement('button');correlations.id='openEstimateCorrelations';correlations.type='button';correlations.textContent='Correlation heatmap…';correlations.onclick=estimateCorrelationOpen;box.appendChild(correlations);
 }
 function estimateSyncControls(){
  if(!estimateAsset()&&!el('estimateControls'))return;estimateInstall();
@@ -124,6 +125,7 @@ function estimateSyncControls(){
  el('estimateDescription').textContent=[...new Set([feature.description,transform.description])].join(' ');
  el('estimateExport').disabled=!estimateCurrent();
  el('estimateReport').hidden=!m.asset.documentation?.some(d=>d.id==='report');
+ el('openEstimateCorrelations').hidden=!m.asset.correlations;
 }
 function estimateFailure(error){if(el('estimateStatus')){el('estimateStatus').textContent=error.message;el('estimateRetry').hidden=false}console.error(error)}
 async function estimateEnsure(){

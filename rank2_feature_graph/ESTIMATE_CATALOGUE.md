@@ -82,6 +82,47 @@ coordinates and camera, and appear in PNG exports. Percentiles describe color
 clipping, not uncertainty; CSVs retain the original estimate and add `display_value`,
 `display_mode` and `response_mean`.
 
+## Optional estimate correlations
+
+The `correlations` extension contains an independent revision, one declared
+transformation/series per feature and checksum-addressed banks for each shared K,
+correlation method and visit mode. It does not replace the original catalogue.
+Banks load on demand and preserve the dataset and sample-order identities.
+Each bank stores its nonconstant feature indices, excluded constant fields,
+upper-triangular correlations (row-major, without the diagonal), complete-linkage
+tree and leaf order. The diagonal is one only for included nonconstant fields.
+
+The reviewed LSVF release compares K = 10, 20, 40 and 80 nearest-people fields,
+with Spearman or Pearson correlation. All chosen fields share 1,965 query visits
+from 1,144 identified participants; unknown identities are excluded. The producer
+asserts common support and never fills missing predictions. Unchecked **Average
+visits per participant** gives each visit weight one divided by that person's
+visit count. Checked averages each person's fields across visits before equal-
+person correlation. Weighted Spearman uses weighted mid-distribution ranks and
+weighted Pearson correlation of those ranks; exact ties share a rank.
+
+Use unclipped saved estimates. Relative color scales and current 3D selection
+do not change the heatmap. Complete linkage of `1 - correlation`, cut at `1 - t`,
+gives clusters with every within-cluster correlation at least `t`. Negative
+correlations remain visible without joining positive clusters. Clustering uses
+all nonconstant fields jointly; group, search and cluster filters affect display
+only. Cluster identifiers are specific to the selected settings.
+
+Open **Correlation heatmap…** under **Exploratory estimates**. It occupies the
+catalogue panel and shares its maximize control. Choose groups for the two axes,
+or the same group for a within-group view. A heatmap cell offers links to color
+the existing 3D samples by either field, without changing selection or coordinates.
+The feature table also provides those links. Settings are remembered per dataset
+and correlation revision.
+
+**Download results ZIP** includes the displayed correlation matrix, assignments
+for every feature (including exclusions and a visibility flag), exact settings
+and source checksums, a README, and an HTML methods page with formulas. The methods
+page is also available in the panel and can be printed/saved as PDF. Correlations
+describe smoothed fields, not underlying-feature association tests or calibrated
+risk. Shared neighborhoods, compositional constraints, assay substitutions and
+larger K can create or strengthen concordance. No naive p-values are supplied.
+
 Each `series` entry describes one available combination:
 
 - `featureId`, `transformationId`, `geometryId`, `estimatorId`, `estimatorLabel`,

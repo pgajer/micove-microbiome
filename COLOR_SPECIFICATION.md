@@ -627,6 +627,14 @@ the complete version 2 catalogue includes 1,129 targets and its illustrated PDF
 report. Original signed lactic-acid readings remain separate from corrected
 measurements. Preferences are stored by dataset and catalogue revision. See [catalogue format](rank2_feature_graph/ESTIMATE_CATALOGUE.md).
 
+LSVF estimate-correlation heatmaps use a fixed signed scale from −1 (blue) through
+zero (near white) to +1 (red). They compare original saved estimates, independent
+of response color clipping, relative mode and 3D selection. Columns carry feature-
+group and joint-cluster strips, with names and cluster IDs also in hover/table
+text. Constant fields are explicitly excluded. Selecting a feature recolors the
+current sample view with its declared transformation and shared neighborhood K;
+sample selection, coordinates, reference appearance and camera remain unchanged.
+
 ### AGP outcome probability colors
 
 AGP's **Color by** dropdown is in **Sample coloring** in the sample panel's right
