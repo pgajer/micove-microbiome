@@ -116,6 +116,24 @@ class EstimatePackagingTests(unittest.TestCase):
                 attach(self.page, self.folder)
         self.assertEqual(self.page.read_bytes(), before)
 
+    def test_smoothed_representation_is_lazy_and_preserves_original_parts(self):
+        self.fixture.smoothed_embedding_fixture()
+        digest = p.sha((self.folder/'manifest.json').read_bytes())
+        receipt = json.loads((self.folder/'validation.json').read_text())
+        receipt['manifestSha256'] = digest
+        (self.folder/'validation.json').write_text(json.dumps(receipt))
+        with patch.dict('estimate_supplement.REVIEWED', {digest: {**self.fixture.expected, 'releaseStage':'full'}}):
+            attach(self.page, self.folder)
+        entry = p.read_manifest(self.page)['datasets']['synthetic']
+        descriptor = entry['estimateAssets']['representations']['smooth-test']
+        self.assertNotIn(descriptor, entry['parts'])
+        self.assertEqual(entry['parts'][:-1], self.original['datasets']['synthetic']['parts'])
+        representation = json.loads(p.checked_bytes(self.web, descriptor))
+        self.assertEqual(representation['targetMetric'], 'linf')
+        self.assertFalse(representation['postMaxNormalization'])
+        index = json.loads(p.checked_bytes(self.web, entry['estimateAssets']['index']))['estimateCatalogues']['synthetic']
+        self.assertEqual(index['smoothedEmbeddings'][0]['http'], descriptor)
+
     def test_uninstalled_dataset_is_unchanged(self):
         self.manifest['datasets'] = {}; self.write()
         before = self.page.read_bytes()

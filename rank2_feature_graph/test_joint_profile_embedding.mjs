@@ -74,6 +74,30 @@ assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),outcomeExclud
 assert.equal(JSON.stringify(source),frozen);
 console.log('PASS: independent equal-group map identity, coordinates, selection and color preservation.');
 
+// Smoothed abundance maps use the same identity-safe selection/color adapter.
+const smooth={...structuredClone(data),format:'micove-smoothed-phylotype-embedding',id:'smooth',
+ coordinates:[[31,32,33],[34,35,36],[37,38,39]],profileScores:[[.8,.1],[.7,.2],[.6,.4]],
+ featureIds:['a','b'],featureNames:['A','B'],K:40,participants:2,normalization:'max',
+ postMaxNormalization:false,neighborMetric:'intrinsic-euclidean-faces',targetMetric:'linf'};
+delete smooth.snapshot;
+asset.smoothedEmbeddings=[{id:'smooth',sha256:'smoothed',http:{}}];
+ctx.VME_ASSETS.group=async key=>structuredClone(key.endsWith(':smoothed')?smooth:data);
+ctx.jointEmbeddingRestore({id:'smooth',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+const smoothTraces=ctx.jointEmbeddingTransform(source,layout).traces;
+assert.deepEqual(plain(smoothTraces[0].x),[31,34,37]);
+assert.deepEqual(plain(smoothTraces[0].ids),plain(transformed.traces[0].ids));
+assert.deepEqual(plain(smoothTraces[0].marker),plain(transformed.traces[0].marker));
+assert.equal(smoothTraces.length,1,'No invented taxonomic reference positions');
+assert.match(ctx.smoothedEmbeddingNote(smooth),/face-aware intrinsic Euclidean neighbors/);
+assert.match(ctx.smoothedEmbeddingNote(smooth),/L∞ MDS target/);
+assert.match(ctx.smoothedEmbeddingTitle(smooth),/no post-normalization/);
+assert.match(ctx.smoothedEmbeddingTitle({...smooth,postMaxNormalization:true}),/post-normalized/);
+assert.match(el('sampleTitle').textContent,/Smoothed phylotypes/);
+ctx.jointEmbeddingRestore({id:'test',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),data.coordinates);
+assert.equal(JSON.stringify(source),frozen);
+console.log('PASS: smoothed abundance representations preserve selections, colors and existing maps; smoothing and MDS metrics remain distinct.');
+
 // Default ordering is independent of immutable catalogue order and explicit preferences.
 const originalId='lsvf-joint39-euclidean-v1',excludedId='lsvf-joint-outcome-excluded-euclidean-v1';
 const lsvf={datasetId:'lsvf-v3v4-20241111',revision:'v4',profileEmbeddings:[{id:originalId},{id:excludedId}]};
@@ -92,6 +116,11 @@ const threeMaps={...lsvf,profileEmbeddings:[{id:originalId},{id:excludedId,exclu
 const three=preferences(threeMaps);
 assert.deepEqual(plain(three.context.jointEmbeddingChoices()).map(d=>d.id),[excludedId,balancedId,originalId]);
 assert.equal(three.model.selectedId,excludedId,'Equal-feature outcome-excluded default remains unchanged');
+const withSmooth={...threeMaps,smoothedEmbeddings:[{id:'smooth'}]};
+assert.equal(preferences(withSmooth).model.selectedId,excludedId,'Adding smoothed maps preserves the existing default');
+const smoothedSaved=preferences(withSmooth);
+smoothedSaved.context.jointEmbeddingRestore({id:'smooth',choice:'profiles'});
+assert.equal(preferences(withSmooth,[...smoothedSaved.values]).model.selectedId,'smooth');
 three.context.jointEmbeddingRestore({id:balancedId,choice:'profiles'});
 assert.equal(preferences(threeMaps,[...three.values]).model.selectedId,balancedId,'Equal-group choice persists separately');
 for(const selectedId of [originalId,excludedId]){

@@ -45,6 +45,12 @@ response mean apply; unsupported targets remain gray. No response enters the
 profiles, and selecting a color field does not alter sample membership or
 coordinates. See [profile outcome methods](rank2_feature_graph/PROFILE_OUTCOMES.md).
 
+LSVF's optional K=40 smoothed-phylotype representations retain these same color
+fields and selections. Their face-aware smoothing neighborhoods define the map
+inputs only; they do not refit or replace the displayed outcome estimates.
+Each map identifies its normalization and target metric in Representation and
+the methods page. See [smoothed-phylotype methods](rank2_feature_graph/SMOOTHED_PHYLOTYPES.md).
+
 In AGP pure or merged 1-CST connection views, selecting an edge preserves the state colors
 of its boundary samples and draws other displayed samples in gray (`#dedede`).
 The **Show background samples** checkbox hides or shows this gray context;

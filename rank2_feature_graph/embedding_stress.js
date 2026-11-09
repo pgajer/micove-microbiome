@@ -9,7 +9,7 @@ function stressPairs(n,limit=20000,seed=embeddingStressSeed){
 }
 function stressDistance(a,b,metric='abundance_euclidean',anchor=null){
  let i=0,j=0,sum=0;const ratio=metric.includes('ratio'),root=metric==='sqrt_ratio_euclidean',hell=metric==='hellinger',js=metric==='jensen_shannon';
- const maximum=metric.startsWith('maxnorm_'),infinity=metric==='maxnorm_linf';
+ const maximum=metric.startsWith('maxnorm_'),infinity=metric==='maxnorm_linf'||metric==='profile_linf';
  const ar=maximum?Math.max(...a.map(v=>v[1])):ratio?a.find(v=>v[0]===anchor)?.[1]:1,br=maximum?Math.max(...b.map(v=>v[1])):ratio?b.find(v=>v[0]===anchor)?.[1]:1;
  if(!(ar>0&&br>0))throw Error('Reference abundance is zero in ratio coordinates.');
  while(i<a.length||j<b.length){const ai=a[i]?.[0]??Infinity,bj=b[j]?.[0]??Infinity,k=Math.min(ai,bj);let u=ai===k?a[i++][1]:0,v=bj===k?b[j++][1]:0;

@@ -14,6 +14,11 @@ assert.equal(c.stressDistance([[0,.25],[1,.75]],[[0,.5],[1,.5]],'ratio_euclidean
 assert(Math.abs(c.stressDistance([[0,.25],[1,.75]],[[0,.5],[1,.5]],'sqrt_ratio_euclidean',0)-(Math.sqrt(3)-1))<1e-14);
 r=c.evaluateEmbeddingStress([rows[0],rows[0]],[[0,0,0],[0,0,0]]);assert.equal(r.relativeRms,null);assert.equal(r.zeroPairs,1);
 assert.equal(c.evaluateEmbeddingStress([],[]).relativeRms,null);
+// Unprojected max-smoothed fields must not be max-normalized during evaluation.
+const rawA=[[0,.5],[1,.2]],rawB=[[0,.25],[1,.4]];
+assert.equal(c.stressDistance(rawA,rawB,'profile_linf'),.25);
+assert.equal(c.stressDistance(rawA,rawB,'maxnorm_linf'),.6);
+assert(Math.abs(c.stressDistance(rawA,rawB,'profile_euclidean')-Math.hypot(.25,.2))<1e-14);
 const a=c.stressPairs(1000),b=c.stressPairs(1000);assert.equal(a.pairs.length,20000);assert.equal(JSON.stringify(a),JSON.stringify(b));assert.equal(new Set(a.pairs.map(p=>p.join(','))).size,20000);assert(a.pairs.every(([i,j])=>i>=0&&i<j&&j<1000));
 assert.equal(JSON.stringify([rows,coords]),snapshot);
 c.setEmbeddingStress('test',{relativeRms:.12345,sampled:true},'target');assert.equal(el('test').textContent,'RMS relative error: 12.35% (sampled)');

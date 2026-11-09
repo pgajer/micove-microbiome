@@ -110,6 +110,54 @@ class EstimateCatalogueTests(unittest.TestCase):
         self.manifest['profileEmbeddings'] = [dict(id='joint-test', **self.descriptor('profile.json', data))]
         self.write()
 
+    def smoothed_embedding_fixture(self, change=None):
+        for i, feature in enumerate(self.manifest['features']):
+            feature.update(categoryId='phylotypes', featureIndex=i, sourceName=feature['id'])
+        self.manifest['categories'][0]['id'] = 'phylotypes'
+        data = dict(format='micove-smoothed-phylotype-embedding', version=1, id='smooth-test',
+                    datasetId='synthetic', catalogueRevision='catalogue-1', sampleCount=6,
+                    sampleOrderSha256=self.expected['sampleOrderSha256'], recordIndices=list(range(5)),
+                    coordinates=[[i, 0, 0] for i in range(5)], profileScores=[[.6, .2]]*5,
+                    featureIds=['signal', 'detection'], featureNames=['signal', 'detection'],
+                    participants=4, excludedRecords=1, K=40, filtering='none', normalization='max',
+                    postMaxNormalization=False, neighborMetric='intrinsic-euclidean-faces', targetMetric='linf',
+                    inputMatrixSha256='a'*64, settings=dict(dimension=3, backend='sgd', targetMetric='linf', matrixSha256='a'*64),
+                    evaluation=dict(relativeRms=.2, profiles=5, sampled=False, pairs=10, zeroPairs=0))
+        if change:
+            change(data)
+        self.manifest['smoothedEmbeddings'] = [dict(id='smooth-test', **self.descriptor('smoothed.json', data))]
+        self.write()
+
+    def test_smoothed_representation_keeps_existing_values(self):
+        before = copy.deepcopy(self.shards)
+        self.smoothed_embedding_fixture()
+        self.load()
+        self.assertEqual(before, self.shards)
+
+    def test_catalogue_without_smoothed_maps_keeps_optional_taxon_indices(self):
+        self.manifest['features'][0]['categoryId'] = 'phylotypes'
+        self.manifest['categories'].append(dict(id='phylotypes', label='Phylotypes', description='Synthetic'))
+        self.write()
+        self.load()
+
+    def test_smoothed_representation_rejects_changed_taxa(self):
+        self.smoothed_embedding_fixture(lambda d: d.update(featureIds=['signal']))
+        with self.assertRaisesRegex(ValueError, 'phylotype set differs'):
+            self.load()
+
+    def test_smoothed_representation_checks_max_projection(self):
+        self.smoothed_embedding_fixture(lambda d: d.update(postMaxNormalization=True))
+        with self.assertRaisesRegex(ValueError, 'maximum differs'):
+            self.load()
+
+    def test_smoothed_representation_checks_metric_and_pair_count(self):
+        self.smoothed_embedding_fixture(lambda d: d.update(neighborMetric='linf'))
+        with self.assertRaisesRegex(ValueError, 'neighbor metric differs'):
+            self.load()
+        self.smoothed_embedding_fixture(lambda d: d['evaluation'].update(pairs=9))
+        with self.assertRaisesRegex(ValueError, 'all-pairs evaluation differs'):
+            self.load()
+
     def test_profile_embedding_addition_keeps_existing_values(self):
         before = copy.deepcopy(self.shards)
         self.profile_embedding_fixture()

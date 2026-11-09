@@ -480,6 +480,15 @@ Focused check: `node rank2_feature_graph/test_estimate_correlation_layout.mjs`.
 
 ## Joint cluster catalogue and sample profiles
 
+An optional `smoothedEmbeddings` descriptor list uses the same lazy, identity-checked
+representation adapter as `profileEmbeddings`. Each saved smoothed map contains
+all phylotype coordinates, its record mapping, participant and normalization
+rules, smoothing-neighbor metric, distinct MDS target metric and an all-pairs
+relative-error evaluation. Installation checks complete taxon identity, closure
+or post-normalization where applicable, dimensions and pair counts. These maps
+are added to Representation without changing existing choices or color fields.
+See [smoothed-phylotype methods](SMOOTHED_PHYLOTYPES.md) for the five K=40 variants.
+
 With **Cluster groups → Jointly**, a catalogue above the heatmaps lists all
 assigned joint clusters, independent of heatmap group, search and cluster filters.
 Each collapsible cluster groups its features by type and shows their transformations.

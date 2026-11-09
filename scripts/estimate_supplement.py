@@ -68,6 +68,11 @@ REVIEWED['2489a580532a4b0eb7d6a9ac4ba5db7d01e2cd74d21e5c36aee7581d88f3a8e1'] = {
     **REVIEWED['2f946e1d084dacb7b6b6090ac1f16b692b4755623d7a9f46395840a8e50a09b0'],
 }
 
+# Five audited K=40 smoothed-phylotype maps; all previous fields/maps retained.
+REVIEWED['e66b3982ee13ac39ee03107f5c6a48e45b4e76177ec27c7fee65d9cef3abbf7e'] = {
+    **REVIEWED['2489a580532a4b0eb7d6a9ac4ba5db7d01e2cd74d21e5c36aee7581d88f3a8e1'],
+}
+
 
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
@@ -154,7 +159,7 @@ def attach(page_path, folder):
         descriptor['http'] = http
         correlations[descriptor['id']] = http
     representations = {}
-    for descriptor in packaged.get('profileEmbeddings', []):
+    for descriptor in packaged.get('profileEmbeddings', []) + packaged.get('smoothedEmbeddings', []):
         http = publish(read_json(checked_file(folder, descriptor)))
         descriptor['http'] = http
         representations[descriptor['id']] = http

@@ -187,3 +187,8 @@
 !/rank2_feature_graph/prepare_profile_outcomes.py
 !/rank2_feature_graph/test_profile_outcomes.py
 !/rank2_feature_graph/PROFILE_OUTCOMES.md
+
+!/rank2_feature_graph/prepare_smoothed_phylotypes.py
+!/rank2_feature_graph/fit_smoothed_phylotypes.R
+!/rank2_feature_graph/package_smoothed_phylotypes.py
+!/rank2_feature_graph/SMOOTHED_PHYLOTYPES.md

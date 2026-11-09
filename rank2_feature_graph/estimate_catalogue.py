@@ -523,6 +523,59 @@ def validate_profile_embeddings(folder, manifest):
                 'profile all-pairs evaluation differs')
 
 
+def validate_smoothed_embeddings(folder, manifest):
+    """Check separate taxonomic representations without redefining joint profiles."""
+    descriptors = manifest.get('smoothedEmbeddings', [])
+    require(isinstance(descriptors, list), 'smoothed embeddings must be a list')
+    if not descriptors:
+        return
+    ids = {d['id'] for d in manifest.get('profileEmbeddings', [])}
+    taxa = [f for f in manifest['features'] if f['categoryId'] == 'phylotypes']
+    require(taxa and all(integer(f.get('featureIndex')) and text(f.get('sourceName')) for f in taxa),
+            'smoothed phylotype dictionary is incomplete')
+    taxa.sort(key=lambda f: f['featureIndex'])
+    for descriptor in descriptors:
+        data = read_json(checked_file(folder, descriptor))
+        require(data.get('format') == 'micove-smoothed-phylotype-embedding'
+                and data.get('version') == 1 and text(data.get('id'))
+                and data['id'] == descriptor.get('id') and data['id'] not in ids,
+                'invalid smoothed embedding identity')
+        ids.add(data['id'])
+        require(all(data.get(k) == manifest.get(k) for k in ('datasetId', 'sampleOrderSha256', 'sampleCount'))
+                and data.get('catalogueRevision') == manifest['revision'], 'smoothed dataset differs')
+        records = data.get('recordIndices', [])
+        require(records and all(integer(i) and i < manifest['sampleCount'] for i in records)
+                and len(set(records)) == len(records) and integer(data.get('participants'), 1)
+                and data.get('excludedRecords') == manifest['sampleCount']-len(records), 'smoothed record mapping differs')
+        require(data.get('featureIds') == [f['id'] for f in taxa]
+                and data.get('featureNames') == [f['sourceName'] for f in taxa]
+                and data.get('filtering') == 'none', 'smoothed phylotype set differs')
+        require(data.get('K') == 40 and data.get('normalization') in ('l1', 'max')
+                and isinstance(data.get('postMaxNormalization'), bool)
+                and data.get('targetMetric') in ('euclidean', 'linf'), 'invalid smoothing definition')
+        require(data.get('neighborMetric') == ('ambient-euclidean' if data['normalization'] == 'l1' else 'intrinsic-euclidean-faces'), 'smoothed neighbor metric differs')
+        require(data['normalization'] != 'l1' or (not data['postMaxNormalization'] and data['targetMetric'] == 'euclidean'), 'invalid L1 smoothed variant')
+        for key, width in [('coordinates', 3), ('profileScores', len(taxa))]:
+            matrix = data.get(key)
+            require(isinstance(matrix, list) and len(matrix) == len(records)
+                    and all(isinstance(row, list) and len(row) == width and all(number(v) for v in row) for row in matrix), 'invalid smoothed '+key)
+        require(all(0 <= v <= 1+1e-12 for row in data['profileScores'] for v in row), 'invalid smoothed abundance range')
+        if data['normalization'] == 'l1':
+            require(all(abs(sum(row)-1) < 1e-10 for row in data['profileScores']), 'smoothed L1 closure differs')
+        if data['postMaxNormalization']:
+            require(all(abs(max(row)-1) < 1e-12 for row in data['profileScores']), 'smoothed maximum differs')
+        settings, evaluation = data.get('settings', {}), data.get('evaluation', {})
+        require(settings.get('dimension') == 3 and settings.get('backend') == 'sgd'
+                and settings.get('targetMetric') == data['targetMetric']
+                and HASH.fullmatch(str(data.get('inputMatrixSha256', '')))
+                and settings.get('matrixSha256') == data.get('inputMatrixSha256'), 'smoothed solver definition differs')
+        require(number(evaluation.get('relativeRms')) and evaluation['relativeRms'] >= 0
+                and evaluation.get('sampled') is False and evaluation.get('profiles') == len(records)
+                and integer(evaluation.get('pairs'), 1) and integer(evaluation.get('zeroPairs'))
+                and evaluation['pairs']+evaluation['zeroPairs'] == len(records)*(len(records)-1)//2,
+                'smoothed all-pairs evaluation differs')
+
+
 def load_catalogue(folder, expected):
     """Check all assets while retaining only the small catalogue in memory."""
     folder = Path(folder)
@@ -539,6 +592,7 @@ def load_catalogue(folder, expected):
         count += validate_shard(read_json(checked_file(folder, descriptor)), descriptor, manifest, context)
     validate_correlations(folder, manifest, context)
     validate_profile_embeddings(folder, manifest)
+    validate_smoothed_embeddings(folder, manifest)
     return manifest, dict(samples=len(ids), features=len(manifest['features']),
                           series=count, shards=len(context['shards']))
 
