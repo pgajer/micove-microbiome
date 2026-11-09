@@ -35,6 +35,14 @@ The active legend determines the meaning of color in a particular view.
 
 ## Sample coloring
 
+LSVF **Joint-profile outcomes · k=40** uses saved participant-excluded raw
+nearest-case fields in the full outcome-excluded 38-profile geometry. Equal
+feature and equal-group maps use their respective fields. Existing Viridis
+colors, central-95% clipping and optional ratios to the participant-weighted
+response mean apply; unsupported targets remain gray. No response enters the
+profiles, and selecting a color field does not alter sample membership or
+coordinates. See [profile outcome methods](rank2_feature_graph/PROFILE_OUTCOMES.md).
+
 In AGP pure or merged 1-CST connection views, selecting an edge preserves the state colors
 of its boundary samples and draws other displayed samples in gray (`#dedede`).
 The **Show background samples** checkbox hides or shows this gray context;

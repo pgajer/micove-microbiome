@@ -183,3 +183,7 @@
 !/rank2_feature_graph/prepare_joint_profile_embedding.mjs
 !/rank2_feature_graph/fit_joint_profile_embedding.R
 !/rank2_feature_graph/JOINT_PROFILE_EMBEDDING.md
+
+!/rank2_feature_graph/prepare_profile_outcomes.py
+!/rank2_feature_graph/test_profile_outcomes.py
+!/rank2_feature_graph/PROFILE_OUTCOMES.md

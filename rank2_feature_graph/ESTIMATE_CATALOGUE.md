@@ -86,6 +86,25 @@ The **Target** picker has previous/next buttons in the dropdown order within the
 selected feature group. They stop at each end and use the same saved-field
 selection as the dropdown, preserving other settings where supported.
 
+### Joint-profile response fields
+
+Geometries with `profileRepresentationId` and `inputMatrixSha256` bind the
+reviewed nearest-case k=40 fields to a frozen outcome-excluded 38-profile map.
+The validator checks that binding and the binary estimator definition. These
+fields appear in **Joint-profile outcomes · k=40**, separate from the existing
+abundance-space catalogue. Estimation distance follows either supported
+profile representation; other maps allow an explicit profile-space choice.
+Coloring never changes coordinates or selected samples. Unsupported k=40
+targets remain selectable, gray, and explicitly unavailable. They do not
+open correlation heatmaps for the old abundance-space estimates.
+
+See [the response definitions and limitations](PROFILE_OUTCOMES.md). The
+preparation command takes the preserved registry and the two frozen profile
+inputs, requires a new output directory, and appends separate shards while
+retaining every earlier scientific asset. A new checksum-bound validation
+receipt is required before installation. Producer checks are on demand;
+neither estimation nor fitting runs in the ordinary update command.
+
 ## Optional estimate correlations
 
 The `correlations` extension contains an independent revision, one declared

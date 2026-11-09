@@ -15,6 +15,25 @@ const context={console,Map,WeakMap,Set,Number,JSON,Object,Array,Math,String,el,M
  VME_ASSETS:{group:async(key,entry)=>replies.get(entry.parts[0].url)},Plotly:{restyle:async(p,updates,indices)=>{calls.push({updates,indices});for(const i of indices)for(const [key,value] of Object.entries(updates)){if(key==='hovertext')p.data[i][key]=value[0];else if(key.startsWith('marker.'))p.data[i].marker[key.slice(7)]=value[0];else p.data[i][key]=value}}}};
 vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('estimate_colors.js',import.meta.url),'utf8'),context);
 const run=code=>vm.runInContext(code,context);
+// The new response mode follows only its bound profile geometry. Existing
+// abundance-space series stay in their original category and remain selectable.
+{
+ const original=context.BUNDLE_PACK.estimateCatalogues.test;
+ const expanded={...asset,geometries:[{id:'original'},{id:'pf',profileRepresentationId:'equal-features'},{id:'pg',profileRepresentationId:'equal-groups'}],series:[...asset.series,...['pf','pg'].flatMap(geometryId=>['f','rare'].map(featureId=>({id:featureId+'-'+geometryId,featureId,geometryId,shardId:'profiles'})))],features:[...asset.features,{id:'rare',categoryId:'assay',label:'Rare target'}]};
+ context.BUNDLE_PACK.estimateCatalogues.test=expanded;
+ context.jointEmbeddingActive=()=>true;let representation='equal-features';context.jointEmbeddingDescriptor=()=>({id:representation});
+ el('sampleColorScheme').value='estimate:profile-outcomes';
+ assert.equal(run('estimateSelection().id'),'f-pf');
+ assert.deepEqual(Array.from(run('estimateModel().byCategory.get("assay").map(s=>s.id)')),['a','b']);
+ run('estimateModel().choices["profile-outcomes"]="rare-pf"');representation='equal-groups';
+ assert.equal(run('estimateSelection().id'),'rare-pg');
+ representation='original-with-outcomes';assert.equal(run('estimateSelection().id'),'rare-pf');
+ context.jointEmbeddingActive=()=>false;run('estimateModel().choices["profile-outcomes"]="rare-pg"');
+ assert.equal(run('estimateSelection().id'),'rare-pg');
+ el('sampleColorScheme').value='estimate:assay';assert.equal(run('estimateSelection().id'),'a');
+ context.BUNDLE_PACK.estimateCatalogues.test=original;
+ console.log('PASS: profile response geometry follows weighting while preserving target, old estimates and explicit geometry on other maps.');
+}
 assert.deepEqual(Array.from(run('estimateLimits([null,-2,0,2],false)')),[-2,2]);
 assert.equal(run('estimateColor(null,[0,1])'),'#9ca3af');
 assert.notEqual(run('estimateColor(0,[0,1])'),'#9ca3af');

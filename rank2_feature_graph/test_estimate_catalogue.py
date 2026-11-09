@@ -10,6 +10,18 @@ from estimate_catalogue import checked_file, load_catalogue, order_hash, read_js
 
 
 class EstimateCatalogueTests(unittest.TestCase):
+    def test_profile_outcome_geometry_requires_binding(self):
+        self.manifest['geometries'][0]['profileRepresentationId'] = 'missing'
+        with self.assertRaisesRegex(ValueError, 'outcome-excluded representation'):
+            validate_manifest(self.manifest, self.expected)
+
+    def test_profile_outcome_estimator_cannot_be_knn(self):
+        g = self.manifest['geometries'][0]
+        g.update(profileRepresentationId='profile', inputMatrixSha256='a'*64)
+        self.manifest['profileEmbeddings'] = [dict(id='profile', exclusionPolicyId='excluded', weighting='features')]
+        with self.assertRaisesRegex(ValueError, 'binary nearest-case k=40'):
+            validate_manifest(self.manifest, self.expected)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

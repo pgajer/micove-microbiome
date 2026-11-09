@@ -11,19 +11,27 @@ function estimateModel(asset=estimateAsset()){
  const features=new Map(asset.features.map(f=>[f.id,f])),policies=new Map((asset.estimationPolicies||[]).map(p=>[p.id,p]));
  const series=asset.series.map(s=>{const item={...asset.seriesDefaults,...s};return {...item,estimation:item.estimation||policies.get(item.estimationId)}});
  const byCategory=new Map(),bySeries=new Map();
- for(const item of series){const category=features.get(item.featureId).categoryId;if(!byCategory.has(category))byCategory.set(category,[]);byCategory.get(category).push(item);bySeries.set(item.id,item)}
+ const profileGeometries=new Set((asset.geometries||[]).filter(g=>g.profileRepresentationId).map(g=>g.id));
+ for(const item of series){const category=profileGeometries.has(item.geometryId)?'profile-outcomes':features.get(item.featureId).categoryId;if(!byCategory.has(category))byCategory.set(category,[]);byCategory.get(category).push(item);bySeries.set(item.id,item)}
  const storageKey='micove-estimate-colors:'+asset.datasetId+'@'+asset.revision;
  let saved;try{saved=JSON.parse(localStorage.getItem(storageKey))}catch{}
  const model={asset,ids,profiles,recordIndices,features,series,byCategory,bySeries,storageKey,choices:{},clip:saved?.clip!==false,relative:saved?.relative===true,rows:new Map()};
- for(const [category,id] of Object.entries(saved?.choices||{}))if(series.some(s=>s.id===id&&features.get(s.featureId)?.categoryId===category))model.choices[category]=id;
+ for(const [category,id] of Object.entries(saved?.choices||{}))if(byCategory.get(category)?.some(s=>s.id===id))model.choices[category]=id;
  estimateModels.set(asset,model);return model;
 }
 function estimateSave(){const m=estimateModel();if(m)try{localStorage.setItem(m.storageKey,JSON.stringify({choices:m.choices,clip:m.clip,relative:m.relative}))}catch{}}
+function estimateProfileGeometry(){
+ if(typeof jointEmbeddingActive!=='function'||!jointEmbeddingActive())return null;
+ return estimateAsset()?.geometries.find(g=>g.profileRepresentationId===jointEmbeddingDescriptor()?.id)||null;
+}
 function estimateSelection(){
  if(!estimateActive())return null;
  if(sampleColorMode()==='joint-clusters')return jointProfileSeries();
  const m=estimateModel(),category=sampleColorMode().slice(9),rows=m.byCategory.get(category)||[];
- return m.bySeries.get(m.choices[category])||rows[0]||null;
+ const selected=m.bySeries.get(m.choices[category])||rows[0]||null;
+ if(category!=='profile-outcomes'||!selected)return selected;
+ const geometry=estimateProfileGeometry();
+ return geometry?rows.find(s=>s.featureId===selected.featureId&&s.geometryId===geometry.id)||selected:selected;
 }
 function estimateQuantile(sorted,p){const at=(sorted.length-1)*p,low=Math.floor(at);return sorted[low]+(sorted[Math.min(low+1,sorted.length-1)]-sorted[low])*(at-low)}
 function estimateLimits(values,clip=true){const v=values.filter(Number.isFinite).sort((a,b)=>a-b);return v.length?[estimateQuantile(v,clip ? .025 : 0),estimateQuantile(v,clip ? .975 : 1)]:null}
@@ -81,8 +89,11 @@ function estimatePointColor(index,record=null,profile=null){const c=estimateCurr
 function estimateLimitsCached(c){const clip=estimateModel().clip;if(c.clip!==clip||c.limits===undefined){c.clip=clip;c.limits=estimateLimits(c.row.values,clip)}return c.limits}
 function estimateSyncOptions(){
  const select=el('sampleColorScheme'),asset=estimateAsset(),expected=new Set((asset?.categories||[]).map(c=>'estimate:'+c.id));
+ const profiles=asset?.geometries?.some(g=>g.profileRepresentationId);
+ if(profiles)expected.add('estimate:profile-outcomes');
  for(const option of Array.from(select.options))if(option.value.startsWith('estimate:')&&!expected.has(option.value))option.remove();
  const categories=(asset?.categories||[]).map(category=>({value:'estimate:'+category.id,label:category.label+' · estimates'}));
+ if(profiles)categories.push({value:'estimate:profile-outcomes',label:'Joint-profile outcomes · k=40'});
  if(asset?.correlations?.selectionInputs)categories.push({value:'joint-clusters',label:'Joint clusters'});
  for(const option of Array.from(select.options))if(option.value==='joint-clusters'&&!asset?.correlations?.selectionInputs)option.remove();
  return categories.map(category=>{const value=category.value;let option=Array.from(select.options).find(o=>o.value===value);
@@ -126,9 +137,12 @@ function estimateSyncControls(){
  const active=estimateActive()&&sampleColorMode()!=='joint-clusters',box=el('estimateControls');box.hidden=!active;if(!active)return;
  const m=estimateModel(),s=estimateSelection();if(!s)return;
  const feature=m.features.get(s.featureId),transform=feature.transformations.find(t=>t.id===s.transformationId);
- let rows=m.byCategory.get(feature.categoryId)||[];
+ const profileOutcomes=sampleColorMode()==='estimate:profile-outcomes';
+ if(profileOutcomes&&m.choices['profile-outcomes']!==s.id){m.choices['profile-outcomes']=s.id;estimateSave()}
+ let rows=m.byCategory.get(sampleColorMode().slice(9))||[];
  const choices=[['Feature','featureId',v=>m.features.get(v).label],['Transform','transformationId',v=>feature.transformations.find(t=>t.id===v).label],['Estimator','estimatorId',v=>rows.find(r=>r.estimatorId===v).estimatorLabel],['K','k',v=>(s.kMeaning==='case_participants'?'k = ':'K = ')+v+(s.kMeaning==='case_participants'?' case participants':' people')],['Geometry','geometryId',v=>m.asset.geometries.find(g=>g.id===v).label],['Scope','scopeId',v=>v==='all'||v==='global'?'Full eligible reference':m.asset.scopes.find(g=>g.id===v)?.description||v]];
  for(const [id,key,label] of choices){const node=el('estimate'+id),values=[...new Set(rows.map(r=>r[key]))];node.replaceChildren(...values.map(value=>{const o=document.createElement('option');o.value=String(value);o.textContent=label(value);return o}));node.value=String(s[key]);node.disabled=values.length<2;node.parentElement.hidden=['Geometry','Scope'].includes(id)&&values.length<2;rows=rows.filter(r=>r[key]===s[key])}
+ if(profileOutcomes&&estimateProfileGeometry()){el('estimateGeometry').disabled=true;el('estimateGeometry').parentElement.title='Follows the selected outcome-excluded profile representation. Distances use all 38 profile dimensions, not the 3D map.'}else el('estimateGeometry').parentElement.title='';
  const target=el('estimateFeature');
  el('previousEstimateTarget').disabled=target.disabled||target.selectedIndex<=0;
  el('nextEstimateTarget').disabled=target.disabled||target.selectedIndex<0||target.selectedIndex>=target.options.length-1;
@@ -138,10 +152,10 @@ function estimateSyncControls(){
  el('estimateRelative').parentElement.title='Nonnegative responses use estimate / mean. Signed and logarithmic responses use estimate − mean. Each participant has equal weight in the observed-response mean, which stays fixed across selections, embeddings and neighborhood sizes.';
  el('estimateReference').textContent=reference?('Observed transformed-response mean: '+estimateValueText(reference.mean,s)+' '+s.unit+'; '+reference.participants.toLocaleString()+' participants. '+(m.relative&&canRelate?(reference.relativeMode==='ratio'?'Colors show estimate / mean; 1× is the mean.':'Colors show estimate − mean; zero is the mean.'):'')+(canRelate?'':' Relative display unavailable: the reference mean is zero or missing.')):'Install the response-reference supplement to enable relative colors.';
  el('estimateStage').textContent=m.asset.releaseStage==='pilot'?'Pilot: five example features. The complete catalogue and illustrated report are pending.':'Full catalogue: '+m.features.size.toLocaleString()+' targets and '+m.series.length.toLocaleString()+' combinations. Exploratory estimates, not calibrated risk.';
- el('estimateDescription').textContent=[...new Set([feature.description,transform.description])].join(' ');
+ el('estimateDescription').textContent=[...new Set([feature.description,transform.description])].join(' ')+(profileOutcomes?' Distances use all 38 outcome-excluded joint profiles. '+(estimateProfileGeometry()?'Estimation space follows the displayed profile map. ':'Estimation space is selected explicitly; it is independent of this displayed map. ')+(s.counts.availableEstimateCount===0?'Unavailable at k=40: only '+s.counts.positiveParticipants+' people have a positive answer in the reference. k has not been reduced.':'One nearest answering visit per person; all query-participant visits excluded.'):'');
  el('estimateExport').disabled=!estimateCurrent();
- el('estimateReport').hidden=!m.asset.documentation?.some(d=>d.id==='report');
- el('openEstimateCorrelations').hidden=!m.asset.correlations;
+ el('estimateReport').hidden=profileOutcomes||!m.asset.documentation?.some(d=>d.id==='report');
+ el('openEstimateCorrelations').hidden=!m.asset.correlations||profileOutcomes;
 }
 function estimateFailure(error){if(el('estimateStatus')){el('estimateStatus').textContent=error.message;el('estimateRetry').hidden=false}console.error(error)}
 async function estimateEnsure(){
@@ -233,12 +247,17 @@ async function estimateMethods(){
  let dialog=el('estimateMethods');if(!dialog){dialog=document.createElement('dialog');dialog.id='estimateMethods';document.body.appendChild(dialog)}
  dialog.replaceChildren();const close=document.createElement('button');close.textContent='Close';close.onclick=()=>dialog.close();dialog.appendChild(close);
  const print=document.createElement('button');print.textContent='Print / save methods as PDF';print.onclick=()=>{const w=window.open('','_blank');if(w){w.document.write('<!doctype html><title>MiCOVE estimate methods</title><style>body{max-width:50em;margin:3em auto;font:16px serif;line-height:1.5}button{display:none}pre{white-space:pre-wrap;font:inherit}math{display:block math;margin:20px}</style>'+dialog.innerHTML);w.document.close();w.print()}};dialog.appendChild(print);
- if(m.asset.documentation?.some(d=>d.id==='report')){const report=document.createElement('button');report.textContent='Download illustrated report PDF';report.onclick=()=>estimateReport().catch(estimateFailure);dialog.appendChild(report)}
+ if(sampleColorMode()!=='estimate:profile-outcomes'&&m.asset.documentation?.some(d=>d.id==='report')){const report=document.createElement('button');report.textContent='Download illustrated report PDF';report.onclick=()=>estimateReport().catch(estimateFailure);dialog.appendChild(report)}
  const content=document.createElement('div');content.innerHTML='<h2>What is typical among nearby participants?</h2><p>The saved field summarizes answers from other people with similar microbiome profiles. It does not show the query person’s observed answer, an association test or a calibrated disease risk.</p><h3>Nearest-people mean</h3><math><mrow><mover><mi>m</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mfrac><mn>1</mn><mi>K</mi></mfrac><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><mi>g</mi><mo>(</mo><msub><mi>y</mi><mi>j</mi></msub><mo>)</mo></mrow></math><p>x is the query microbiome; K is the number of neighboring people; y is a neighbor’s recorded answer; g is the selected transformation, applied before averaging. One nearest answering visit represents each neighbor. All visits of the query participant are excluded.</p><h3>Nearest-case estimates</h3><math><mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mtext>raw</mtext></msub><mo>=</mo><mfrac><mi>k</mi><mi>T</mi></mfrac><mspace width="2em"/><msub><mover><mi>p</mi><mo>^</mo></mover><mtext>corrected</mtext></msub><mo>=</mo><mfrac><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow><mrow><mi>T</mi><mo>−</mo><mn>1</mn></mrow></mfrac></mrow></math><p>k is the requested number of people with a positive binary answer. T is the number of neighboring people required to reach the kth positive answer. “Case” means the selected binary target, including assay reporting or observed taxon presence. It need not mean disease. The correction addresses the stopping rule; it does not establish calibration.</p>';
  const add=(heading,text)=>{const h=document.createElement('h3');h.textContent=heading;const p=document.createElement('pre');p.textContent=text;content.append(h,p)};
  add('Selected target',feature.label+'\n'+[...new Set([feature.description,transform.description])].join('\n')+'\nUnit: '+s.unit+'\nZero handling: '+transform.zeroPolicy+'\nTransformation (LaTeX): '+transform.formulaTex+'\nParameters: '+JSON.stringify(transform.parameters,null,2));
  add('Neighborhood and support',Object.entries(s.estimation||{}).filter(([k])=>k!=='id').map(([k,v])=>k+': '+v).join('\n')+'\n'+JSON.stringify(s.counts,null,2));
+ const geometry=m.asset.geometries.find(g=>g.id===s.geometryId);
+ if(geometry?.profileRepresentationId){
+  add('Full profile space',geometry.label+'\n'+geometry.normalization+'\n'+geometry.distance+'\nThe responses remain excluded from the 38 cluster profiles. Query-participant exclusion in response aggregation is not end-to-end cross-validation.');
+  const formula=document.createElement('div');formula.innerHTML='<math display="block"><mrow><mi>d</mi><mo>(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo>)</mo><mo>=</mo><msqrt><mrow><munderover><mo>∑</mo><mrow><mi>c</mi><mo>=</mo><mn>1</mn></mrow><mn>38</mn></munderover><msup><mrow><mo>(</mo><msub><mi>S</mi><mrow><mi>i</mi><mi>c</mi></mrow></msub><mo>−</mo><msub><mi>S</mi><mrow><mi>j</mi><mi>c</mi></mrow></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow></msqrt></mrow></math><p>S is a visit’s cluster profile, c identifies a cluster, and i and j identify visits. All 38 dimensions contribute equally. The requested raw estimate is 40/T, where T counts distinct answering people through the 40th positive answer. Missing support stays unavailable.</p>';content.append(formula);
+ }
  add('Response colors','The bar shows the selected transformed-response estimate. Relative mode divides nonnegative estimates by the observed transformed-response mean, or subtracts that mean for signed/logarithmic responses. The reference averages available responses within each participant, then averages participants equally across the full reference. Missing/undefined targets are excluded. It is fixed across selections, embeddings and neighborhood sizes. Colors are clipped at full-field percentiles 2.5 and 97.5 by default; the CSV and hover values remain unclipped. These percentiles are display limits, not confidence intervals.');
  add('Limits','Reference transformations, imputation and scaling were fixed before participant exclusion. These fields are not end-to-end cross-validated predictions.\n'+m.asset.limitations.join('\n')+'\n'+(m.asset.releaseStage==='pilot'?'Pilot examples; the complete illustrated report is pending.':''));dialog.appendChild(content);dialog.showModal();
- const doc=m.asset.documentation.find(d=>d.id==='methods');if(doc){const text=await VME_ASSETS.group('estimate-doc:'+m.asset.revision+':methods',{parts:[doc.http]});if(dialog.open&&estimateAsset()===m.asset)add('Catalogue reading guide',text.text)}
+ const doc=m.asset.documentation.find(d=>d.id===(geometry?.profileRepresentationId?'profile-outcomes':'methods'));if(doc){const text=await VME_ASSETS.group('estimate-doc:'+m.asset.revision+':'+doc.id,{parts:[doc.http]});if(dialog.open&&estimateAsset()===m.asset)add('Catalogue reading guide',text.text)}
 }

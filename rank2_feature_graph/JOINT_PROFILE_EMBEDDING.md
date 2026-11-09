@@ -30,10 +30,19 @@ These groups are assay/feature types, such as immune markers and metabolites;
 they are not different cohorts. A cluster containing features from only one
 group has the same profile under both definitions.
 
-Selecting a representation changes coordinates only. The separate **Weight
+Selecting a representation preserves selected samples and the coloring mode.
+For **Joint-profile outcomes · k=40**, the saved response estimates follow the
+selected outcome-excluded profile geometry. Other color fields remain fixed.
+The separate **Weight
 feature groups equally** checkbox controls cluster-profile coloring and does
 not change the selected map. Thus either geometry can be colored by the same
 individual feature or by either color-profile definition.
+
+The [nearest-case response option](PROFILE_OUTCOMES.md) uses all 38 profile
+coordinates, independently of their 3D approximation. The raw estimate is
+40/T after excluding the query participant. It includes the 17 excluded
+response fields; five cannot support k=40 and remain unavailable. Earlier
+abundance-space estimates remain under their original Color by groups.
 
 **Find feature in clusters…** searches recorded feature names. For example,
 “any STI” finds **Any incident STI**. It is excluded from the new clustering

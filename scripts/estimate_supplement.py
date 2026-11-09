@@ -57,6 +57,12 @@ REVIEWED['40d3c286b6e352e563583710aa6cef1b9d04fe6620cadcaef9b8e1cacf6df9e5'] = {
 }
 
 
+# Additive k=40 response fields in the two frozen outcome-excluded profile spaces.
+REVIEWED['2f946e1d084dacb7b6b6090ac1f16b692b4755623d7a9f46395840a8e50a09b0'] = {
+    **REVIEWED['40d3c286b6e352e563583710aa6cef1b9d04fe6620cadcaef9b8e1cacf6df9e5'],
+}
+
+
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
     if isinstance(value, dict):

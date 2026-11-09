@@ -139,6 +139,15 @@ def validate_manifest(manifest, expected):
     for geometry in geometries.values():
         require(all(text(geometry.get(k)) for k in ('label', 'normalization', 'distance')),
                 'geometry needs normalization and distance definitions')
+        if 'profileRepresentationId' in geometry:
+            descriptor = next((d for d in manifest.get('profileEmbeddings', [])
+                               if d['id'] == geometry['profileRepresentationId']), None)
+            require(descriptor and descriptor.get('exclusionPolicyId')
+                    and descriptor.get('weighting') in ('features', 'groups'),
+                    'profile outcome geometry needs an outcome-excluded representation')
+            require(isinstance(geometry.get('inputMatrixSha256'), str)
+                    and re.fullmatch(r'[0-9a-f]{64}', geometry['inputMatrixSha256']),
+                    'profile outcome geometry needs its input matrix checksum')
     transformations = {}
     for feature in features.values():
         require(feature.get('categoryId') in categories, 'unknown feature category')
@@ -214,6 +223,12 @@ def validate_manifest(manifest, expected):
         require(integer(item.get('k'), 1) and item.get('kMeaning') in ('neighbors', 'case_participants'),
                 'k needs a positive integer and an explicit counting unit')
         require(item.get('valueDomain') in ('probability', 'nonnegative', 'real'), 'unknown value domain')
+        if geometries[item['geometryId']].get('profileRepresentationId'):
+            require(features[item['featureId']]['valueType'] == 'binary'
+                    and item['valueDomain'] == 'probability' and item['k'] == 40
+                    and item['kMeaning'] == 'case_participants'
+                    and item['estimatorId'] == 'nearest-case-raw',
+                    'profile outcome fields require binary nearest-case k=40')
         if 'referenceValue' in item:
             require(number(item['referenceValue']) and text(item.get('referenceLabel')),
                     'reference value needs a finite value and label')
@@ -458,6 +473,11 @@ def validate_profile_embeddings(folder, manifest):
                 and data.get('catalogueRevision') == manifest['revision']
                 and data.get('correlationRevision') == manifest.get('correlations', {}).get('revision'),
                 'profile embedding dataset differs')
+        for geometry in manifest.get('geometries', []):
+            if geometry.get('profileRepresentationId') == data['id']:
+                require(geometry['inputMatrixSha256'] == data.get('inputMatrixSha256')
+                        and len(data.get('snapshot', {}).get('clusters', [])) == 38,
+                        'profile outcome geometry matrix differs')
         records = data.get('recordIndices', [])
         require(records and all(integer(i) and i < manifest['sampleCount'] for i in records)
                 and len(set(records)) == len(records), 'invalid profile record mapping')

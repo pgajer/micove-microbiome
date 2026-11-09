@@ -333,8 +333,9 @@ function estimateCorrelationCluster(bank,s){
 }
 function estimateCorrelationColorSync(s){
  if(!s)return;const mode=sampleColorMode();if(s.lastColor===mode)return;
- s.lastColor=mode;s.open=mode.startsWith('estimate:')||mode==='joint-clusters';
- if(mode.startsWith('estimate:')){s.rows=mode.slice(9);s.cols='all';s.cluster='all';s.search=''}
+ const featureGroup=mode.startsWith('estimate:')&&mode!=='estimate:profile-outcomes';
+ s.lastColor=mode;s.open=featureGroup||mode==='joint-clusters';
+ if(featureGroup){s.rows=mode.slice(9);s.cols='all';s.cluster='all';s.search=''}
  if(mode==='joint-clusters')s.clusteringScope='joint';estimateCorrelationSave();
 }
 function estimateCorrelationClearPlots(){

@@ -69,6 +69,9 @@ run('estimateCorrelationState().open=false;estimateCorrelationColorSync(estimate
 assert.equal(run('estimateCorrelationState().open'),false,'Edge catalogue dismissal lasts within the same color mode');
 context.sampleColorMode=()=> 'estimate:y';run('estimateCorrelationColorSync(estimateCorrelationState())');
 assert.equal(run('estimateCorrelationState().rows'),'y');assert.equal(run('estimateCorrelationState().open'),true);
+context.sampleColorMode=()=> 'estimate:profile-outcomes';run('estimateCorrelationColorSync(estimateCorrelationState())');
+assert.equal(run('estimateCorrelationState().open'),false);
+assert.notEqual(run('estimateCorrelationState().rows'),'profile-outcomes');
 context.sampleColorMode=()=> 'default';run('estimateCorrelationColorSync(estimateCorrelationState())');
 assert.equal(run('estimateCorrelationState().open'),false);
 asset.categories=[{id:'x',label:'Group X'},{id:'y',label:'Group Y'},{id:'assay-availability',label:'Assay availability'}];
