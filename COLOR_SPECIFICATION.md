@@ -35,9 +35,11 @@ The active legend determines the meaning of color in a particular view.
 
 ## Sample coloring
 
-LSVF **Joint-profile outcomes · k=40** uses saved participant-excluded raw
+LSVF **Joint-profile outcomes** uses saved participant-excluded raw
 nearest-case fields in the full outcome-excluded 38-profile geometry. Equal
-feature and equal-group maps use their respective fields. Existing Viridis
+feature and equal-group maps use their respective fields at the chosen case
+count (k = 5, 10, 20 or 40). Target and k persist across weighting changes.
+Existing Viridis
 colors, central-95% clipping and optional ratios to the participant-weighted
 response mean apply; unsupported targets remain gray. No response enters the
 profiles, and selecting a color field does not alter sample membership or

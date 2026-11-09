@@ -31,7 +31,7 @@ they are not different cohorts. A cluster containing features from only one
 group has the same profile under both definitions.
 
 Selecting a representation preserves selected samples and the coloring mode.
-For **Joint-profile outcomes · k=40**, the saved response estimates follow the
+For **Joint-profile outcomes**, the saved response estimates follow the
 selected outcome-excluded profile geometry. Other color fields remain fixed.
 The separate **Weight
 feature groups equally** checkbox controls cluster-profile coloring and does
@@ -40,8 +40,11 @@ individual feature or by either color-profile definition.
 
 The [nearest-case response option](PROFILE_OUTCOMES.md) uses all 38 profile
 coordinates, independently of their 3D approximation. The raw estimate is
-40/T after excluding the query participant. It includes the 17 excluded
-response fields; five cannot support k=40 and remain unavailable. Earlier
+k/T after excluding the query participant. Neighborhood size offers k = 5,
+10, 20 and 40, retaining the choice across profile spaces. It includes the 17
+excluded response fields; insufficient case counts remain unavailable at the
+chosen k. Smaller neighborhoods allow exploration of rarer responses but are
+less stable. The original k=40 arrays are reused unchanged. Earlier
 abundance-space estimates remain under their original Color by groups.
 
 **Find feature in clusters…** searches recorded feature names. For example,

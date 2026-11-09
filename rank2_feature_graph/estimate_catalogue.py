@@ -225,10 +225,10 @@ def validate_manifest(manifest, expected):
         require(item.get('valueDomain') in ('probability', 'nonnegative', 'real'), 'unknown value domain')
         if geometries[item['geometryId']].get('profileRepresentationId'):
             require(features[item['featureId']]['valueType'] == 'binary'
-                    and item['valueDomain'] == 'probability' and item['k'] == 40
+                    and item['valueDomain'] == 'probability' and item['k'] in (5, 10, 20, 40)
                     and item['kMeaning'] == 'case_participants'
                     and item['estimatorId'] == 'nearest-case-raw',
-                    'profile outcome fields require binary nearest-case k=40')
+                    'profile outcome fields require binary nearest-case k in 5, 10, 20, 40')
         if 'referenceValue' in item:
             require(number(item['referenceValue']) and text(item.get('referenceLabel')),
                     'reference value needs a finite value and label')

@@ -89,12 +89,14 @@ selection as the dropdown, preserving other settings where supported.
 ### Joint-profile response fields
 
 Geometries with `profileRepresentationId` and `inputMatrixSha256` bind the
-reviewed nearest-case k=40 fields to a frozen outcome-excluded 38-profile map.
+reviewed nearest-case fields (k = 5, 10, 20, 40) to a frozen outcome-excluded 38-profile map.
 The validator checks that binding and the binary estimator definition. These
-fields appear in **Joint-profile outcomes · k=40**, separate from the existing
+fields appear in **Joint-profile outcomes**, separate from the existing
 abundance-space catalogue. Estimation distance follows either supported
 profile representation; other maps allow an explicit profile-space choice.
-Coloring never changes coordinates or selected samples. Unsupported k=40
+Neighborhood size selects the number of case participants. It is remembered
+and retained when changing targets or profile weighting; existing k=40 series
+are reused unchanged. Coloring never changes coordinates or selected samples. Unsupported
 targets remain selectable, gray, and explicitly unavailable. They do not
 open correlation heatmaps for the old abundance-space estimates.
 

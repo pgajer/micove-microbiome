@@ -5,6 +5,23 @@ from prepare_profile_outcomes import scan
 
 
 class ProfileOutcomeTests(unittest.TestCase):
+    def test_case_sizes_use_nested_prefixes_and_reveal_rare_targets(self):
+        groups = np.arange(81)
+        y = (groups % 2 == 1).astype(float)
+        order = np.tile(groups, (len(groups), 1))
+        distances = np.tile(groups.astype(float), (len(groups), 1))
+        previous = 0
+        for k in (5, 10, 20, 40):
+            row = scan(distances, order, groups, y, k)
+            self.assertEqual(row['support']['caseParticipantCount'][0], k)
+            self.assertEqual(row['support']['participantCount'][0], 2*k-1)
+            self.assertEqual(row['values'][0], k/(2*k-1))
+            self.assertGreater(row['support']['radius'][0], previous)
+            previous = row['support']['radius'][0]
+        # A query case excludes itself: only 39 cases remain at k=40.
+        self.assertEqual(row['status'][1], 'insufficient_cases')
+        self.assertEqual(scan(distances, order, groups, y, 20)['status'][1], 'ok')
+
     def test_nearest_answering_visit_and_query_exclusion(self):
         groups = np.array([0, 1, 1, 2, 3, 0, 4, 4, -1])
         y = np.array([1, 0, 1, 1, 0, 1, np.nan, 1, 1])

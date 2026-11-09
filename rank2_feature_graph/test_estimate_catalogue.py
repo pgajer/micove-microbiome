@@ -19,7 +19,20 @@ class EstimateCatalogueTests(unittest.TestCase):
         g = self.manifest['geometries'][0]
         g.update(profileRepresentationId='profile', inputMatrixSha256='a'*64)
         self.manifest['profileEmbeddings'] = [dict(id='profile', exclusionPolicyId='excluded', weighting='features')]
-        with self.assertRaisesRegex(ValueError, 'binary nearest-case k=40'):
+        with self.assertRaisesRegex(ValueError, 'binary nearest-case k in'):
+            validate_manifest(self.manifest, self.expected)
+
+    def test_profile_outcome_case_size_grid(self):
+        self.manifest['geometries'][0].update(profileRepresentationId='profile', inputMatrixSha256='a'*64)
+        self.manifest['profileEmbeddings'] = [dict(id='profile', exclusionPolicyId='excluded', weighting='features')]
+        for feature in self.manifest['features']:
+            feature['valueType'] = 'binary'
+        for k in (5, 10, 20, 40):
+            for series in self.series:
+                series.update(k=k, kMeaning='case_participants', valueDomain='probability', estimatorId='nearest-case-raw')
+            validate_manifest(self.manifest, self.expected)
+        self.series[0]['k'] = 8
+        with self.assertRaisesRegex(ValueError, 'binary nearest-case k in'):
             validate_manifest(self.manifest, self.expected)
 
     def setUp(self):

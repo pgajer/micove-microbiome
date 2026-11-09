@@ -19,7 +19,7 @@ const run=code=>vm.runInContext(code,context);
 // abundance-space series stay in their original category and remain selectable.
 {
  const original=context.BUNDLE_PACK.estimateCatalogues.test;
- const expanded={...asset,geometries:[{id:'original'},{id:'pf',profileRepresentationId:'equal-features'},{id:'pg',profileRepresentationId:'equal-groups'}],series:[...asset.series,...['pf','pg'].flatMap(geometryId=>['f','rare'].map(featureId=>({id:featureId+'-'+geometryId,featureId,geometryId,shardId:'profiles'})))],features:[...asset.features,{id:'rare',categoryId:'assay',label:'Rare target'}]};
+ const expanded={...asset,geometries:[{id:'original'},{id:'pf',profileRepresentationId:'equal-features'},{id:'pg',profileRepresentationId:'equal-groups'}],series:[...asset.series,...[40,5,10,20].flatMap(k=>['pf','pg'].flatMap(geometryId=>['f','rare'].map(featureId=>({id:featureId+'-'+geometryId+(k===40?'':'-k'+k),featureId,k,geometryId,shardId:'profiles'}))))],features:[...asset.features,{id:'rare',categoryId:'assay',label:'Rare target'}]};
  context.BUNDLE_PACK.estimateCatalogues.test=expanded;
  context.jointEmbeddingActive=()=>true;let representation='equal-features';context.jointEmbeddingDescriptor=()=>({id:representation});
  el('sampleColorScheme').value='estimate:profile-outcomes';
@@ -27,6 +27,12 @@ const run=code=>vm.runInContext(code,context);
  assert.deepEqual(Array.from(run('estimateModel().byCategory.get("assay").map(s=>s.id)')),['a','b']);
  run('estimateModel().choices["profile-outcomes"]="rare-pf"');representation='equal-groups';
  assert.equal(run('estimateSelection().id'),'rare-pg');
+ for(const k of [5,10,20]){
+  run('estimateModel().choices["profile-outcomes"]="rare-pf-k'+k+'"');
+  assert.equal(run('estimateSelection().id'),'rare-pg-k'+k);
+  assert.equal(run('estimateSelection().k'),k);
+ }
+ run('estimateModel().choices["profile-outcomes"]="rare-pf"');
  representation='original-with-outcomes';assert.equal(run('estimateSelection().id'),'rare-pf');
  context.jointEmbeddingActive=()=>false;run('estimateModel().choices["profile-outcomes"]="rare-pg"');
  assert.equal(run('estimateSelection().id'),'rare-pg');

@@ -63,6 +63,12 @@ REVIEWED['2f946e1d084dacb7b6b6090ac1f16b692b4755623d7a9f46395840a8e50a09b0'] = {
 }
 
 
+# Additional case counts reuse the original profile maps and k=40 fields.
+REVIEWED['2489a580532a4b0eb7d6a9ac4ba5db7d01e2cd74d21e5c36aee7581d88f3a8e1'] = {
+    **REVIEWED['2f946e1d084dacb7b6b6090ac1f16b692b4755623d7a9f46395840a8e50a09b0'],
+}
+
+
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
     if isinstance(value, dict):

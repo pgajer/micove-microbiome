@@ -15,7 +15,7 @@ Here c identifies a cluster and S_ic is the median percentile profile of that
 cluster at visit i, using the chosen feature weighting. The coordinates and
 their reference percentile scales remain fixed when selecting samples.
 
-## Counting people and stopping at 40 cases
+## Counting people and choosing the case count
 
 All visits of the query participant are excluded. Among other participants,
 use each person's nearest visit with an observed answer for the target, then
@@ -24,13 +24,17 @@ treated as a negative. If answers change across visits, the nearest answering
 visit determines that person's response; a farther positive visit does not
 replace a nearer negative one. Each person is counted once.
 
-Stop when the neighborhood reaches the 40th positive-answer person. If T is
-the number of people reached, the requested raw nearest-case estimate is
+Choose k = **5, 10, 20 or 40** in Neighborhood size. Stop when the neighborhood
+reaches positive-answer person number k. If T is the number of people reached,
+the requested raw nearest-case estimate is
 
-\[\widehat p(i)=40/T_i.\]
+\[\widehat p_k(i)=k/T_{i,k}.\]
 
-This is **40 cases**, not 40 nearest people. The neighborhood can be large for
-rare targets. The stopping-rule correction (39/(T-1)) is a different estimate
+Here i denotes the query visit and T depends on both that visit and k. This is
+**k cases**, not k nearest people. Smaller k uses a more local neighborhood but
+produces a less stable estimate; larger k smooths more broadly. The neighborhood
+can still be large for rare targets. No k is chosen as a validated optimum.
+The stopping-rule correction ((k-1)/(T-1)) is a different estimate
 and is not substituted here. Distances tied exactly are ordered by the SHA-256
 hash of `nearest-cases-v1|specimen ID`, then specimen ID, consistently across
 targets and geometries. This deterministic prefix can split a distance tie.
@@ -41,6 +45,11 @@ fewer than 40 positive participants even before query exclusion: reported
 diabet (8), mvp (27), thyroid (27), yeasttx (21), and health: poor (11).
 Their k=40 fields remain selectable but are entirely unavailable. Other
 query-specific failures also remain missing; k is never lowered automatically.
+The smaller choices allow exploration of rare targets where enough other people
+have positive answers. For example, eight reported-diabet case participants can
+potentially support k=5, but cannot support k=10, 20 or 40. Availability remains
+query-specific because the query person is excluded and the nearest answering
+visit determines each neighbor's response.
 Incident GC has additional query-specific shortages: 76 of 1,965 visits under
 equal-feature weighting and 11 under equal-group weighting. Although 59 people
 have a positive GC answer somewhere in the reference, their nearest answering
@@ -65,11 +74,13 @@ categories; missing health answers are excluded. Answers can change by visit.
 
 ## Using the fields
 
-Choose **Joint-profile outcomes · k=40** under Color by, then a Target. In
+Choose **Joint-profile outcomes** under Color by, then a Target and
+**Neighborhood size**. Existing saved k=40 choices remain valid; the original
+k=40 arrays are reused unchanged. In
 either supported outcome-excluded profile representation, the estimation
 geometry follows the displayed representation. On other representations,
 Estimation distance explicitly selects which saved profile space supplies
-the colors. It never switches to 3D distances. Target, relative colors and
+the colors. It never switches to 3D distances. Target, k, relative colors and
 color clipping are remembered. Samples and selections are unchanged.
 
 The color scale clips only the display at the full field's 2.5th and 97.5th
@@ -86,4 +97,5 @@ percentile scales and clustering fixed on the full reference. Excluding the
 query participant from the final response neighborhood is **not end-to-end
 cross-validation**. These colors are exploratory, not calibrated probabilities,
 causal effects, significance tests or evidence of clinical predictive accuracy.
-No tuning of k, uncertainty intervals or new validation models were requested.
+The selector is for exploratory comparison, not automatic tuning or validation.
+No uncertainty intervals or new validation models are supplied.

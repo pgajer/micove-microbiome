@@ -17,7 +17,7 @@ TARGETS = ['Any incident STI', 'Incident CT', 'Incident GC', 'Incident TV'] + [
     'Reported ' + s for s in ('diabet', 'mvp', 'thyroid', 'asthma', 'allergy',
                               's_cell', 'anemia', 'metro', 'yeasttx')
 ] + ['health: ' + s for s in ('excellent', 'good', 'fair', 'poor')]
-K = 40
+CASE_SIZES = (5, 10, 20, 40)
 
 
 def sha(path):
@@ -78,6 +78,7 @@ def main():
     parser.add_argument('--equal-features', type=Path, required=True)
     parser.add_argument('--equal-groups', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--case-sizes', type=int, nargs='+', default=list(CASE_SIZES), choices=CASE_SIZES)
     args = parser.parse_args()
     if args.output.exists():
         raise ValueError('Output already exists; preserve earlier exports.')
@@ -95,15 +96,20 @@ def main():
         t = next(t for t in targets if t['featureId'] == f['id'] and t['transformationId'] == 'probability')
         assert t['binary'] and f['id'] in {f['id'] for f in manifest['features']}
         selected.append((f, t))
-    policy_id = 'profile-nearest-case-40-v1'
-    policy = copy.deepcopy(next(p for p in manifest['estimationPolicies'] if p['id'] == 'participant-excluded'))
-    policy.update(id=policy_id,
-        trainingPopulation='Finite observed binary answers among visits with frozen outcome-excluded joint profiles and known participants.',
-        queryPopulation='The same 1,965 profile visits; 26 records without participant identity remain unavailable.',
-        boundaryStoppingRule='Stop at the 40th positive-answer participant; report 40/T. No adaptive k or fallback.',
-        validationDesign='Descriptive, not cross-validated prediction. Profiles, percentile scales and clusters were frozen using the full reference; query-participant exclusion applies only to the final response aggregation.')
-    manifest['estimationPolicies'].append(policy)
-    outputs, audit, inputs = [], [], {}
+    sizes = sorted(set(args.case_sizes))
+    for k in sizes:
+        policy_id = 'profile-nearest-case-'+str(k)+'-v1'
+        if any(p['id'] == policy_id for p in manifest['estimationPolicies']):
+            continue
+        policy = copy.deepcopy(next(p for p in manifest['estimationPolicies'] if p['id'] == 'participant-excluded'))
+        policy.update(id=policy_id,
+            trainingPopulation='Finite observed binary answers among visits with frozen outcome-excluded joint profiles and known participants.',
+            queryPopulation='The same 1,965 profile visits; 26 records without participant identity remain unavailable.',
+            boundaryStoppingRule=f'Stop at positive-answer participant number {k}; report {k}/T. No adaptive k or fallback.',
+            validationDesign='Descriptive, not cross-validated prediction. Profiles, percentile scales and clusters were frozen using the full reference; query-participant exclusion applies only to the final response aggregation.')
+        manifest['estimationPolicies'].append(policy)
+    outputs, audit, inputs, reused = [], [], {}, []
+    original_series = {s['id']: s for s in manifest['series']}
     previous = None
     for weighting, folder in [('features', args.equal_features), ('groups', args.equal_groups)]:
         inp = read(folder/'input.json')
@@ -132,64 +138,81 @@ def main():
             hashlib.sha256(('nearest-cases-v1|'+ids[records[j]]).encode()).hexdigest(), ids[records[j]])))
         order = priority[np.argsort(distances[:, priority], axis=1, kind='stable')]
         geometry_id = 'joint38-outcome-excluded-equal-'+weighting+'-euclidean'
-        manifest['geometries'].append(dict(id=geometry_id,
+        geometry = dict(id=geometry_id,
             label='38 joint profiles · Equal '+weighting+' · Euclidean',
             normalization='Frozen median feature percentiles; equal '+weighting+' within each cluster; all 38 dimensions equally weighted.',
             distance='Euclidean in all 38 profile columns; not distances in the 3D map.',
             description='Outcome-excluded frozen profiles; nearest answering visit per person; all query-participant visits excluded.',
-            profileRepresentationId=rep['id'], inputMatrixSha256=inp['matrixSha256']))
+            profileRepresentationId=rep['id'], inputMatrixSha256=inp['matrixSha256'])
+        old_geometry = next((g for g in manifest['geometries'] if g['id'] == geometry_id), None)
+        if old_geometry:
+            assert old_geometry == geometry
+        else:
+            manifest['geometries'].append(geometry)
         inputs[weighting] = dict(inputSha256=sha(folder/'input.json'), matrixSha256=inp['matrixSha256'],
             representationId=rep['id'], representationSha256=rep['sha256'], records=len(records), participants=len(set(groups.tolist())))
-        shard_id = 'profile-outcomes-'+weighting+'-k40-v1'
-        shard = dict(format='micove-estimate-shard', version=1, datasetId=manifest['datasetId'],
-                     catalogueRevision=manifest['revision'], sampleOrderSha256=manifest['sampleOrderSha256'], series={})
-        for f, t in selected:
-            y = registry['values'][records, t['index']]
-            assert np.isin(y[np.isfinite(y)], [0, 1]).all()
-            row = scan(distances, order, groups, y, K)
-            full = dict(values=[None]*len(ids), status=['unknown_participant']*len(ids),
-                        support={key: [None]*len(ids) for key in row['support']})
-            for j, i in enumerate(records):
-                full['values'][i], full['status'][i] = row['values'][j], row['status'][j]
-                for key in row['support']:
-                    full['support'][key][i] = row['support'][key][j]
-            sid = f['id']+'--profile-'+weighting+'--nearest-case-raw--40'
-            shard['series'][sid] = full
-            valid = np.isfinite(y)
-            positive = y == 1
-            counts = dict(trainingObservations=int(valid.sum()), trainingParticipants=len(set(groups[valid].tolist())),
-                positiveObservations=int(positive.sum()), positiveParticipants=len(set(groups[positive].tolist())),
-                queryCount=len(ids), availableEstimateCount=row['status'].count('ok'))
-            manifest['series'].append(dict(id=sid, featureId=f['id'], transformationId='probability',
-                geometryId=geometry_id, estimatorId='nearest-case-raw', estimatorLabel='Nearest-case raw (40/T)',
-                k=K, kMeaning='case_participants', scopeId='global', estimationId=policy_id,
-                quantityLabel=f['label']+' — nearest-case estimate', unit='probability', shardId=shard_id,
-                valueDomain='probability', counts=counts,
-                limitations=['Unavailable where 40 positive-answer people cannot be reached. A person contributes the answer from their nearest answering visit, not any positive visit.']))
-            audit.append(dict(target=f['sourceName'], featureId=f['id'], geometryId=geometry_id,
-                **counts, insufficientCases=row['status'].count('insufficient_cases'),
-                reachedPeopleRange=[min(row['support']['participantCount']), max(row['support']['participantCount'])]))
-        outputs.append((shard_id, shard))
+        for k in sizes:
+            policy_id = 'profile-nearest-case-'+str(k)+'-v1'
+            shard_id = 'profile-outcomes-'+weighting+'-k'+str(k)+'-v1'
+            shard = dict(format='micove-estimate-shard', version=1, datasetId=manifest['datasetId'],
+                       catalogueRevision=manifest['revision'], sampleOrderSha256=manifest['sampleOrderSha256'], series={})
+            for f, t in selected:
+                sid = f['id']+'--profile-'+weighting+'--nearest-case-raw--'+str(k)
+                if sid in original_series:
+                    old = original_series[sid]
+                    assert old['k'] == k and old['geometryId'] == geometry_id and old['featureId'] == f['id']
+                    reused.append(sid)
+                    continue
+                y = registry['values'][records, t['index']]
+                assert np.isin(y[np.isfinite(y)], [0, 1]).all()
+                row = scan(distances, order, groups, y, k)
+                full = dict(values=[None]*len(ids), status=['unknown_participant']*len(ids),
+                            support={key: [None]*len(ids) for key in row['support']})
+                for j, i in enumerate(records):
+                    full['values'][i], full['status'][i] = row['values'][j], row['status'][j]
+                    for key in row['support']:
+                        full['support'][key][i] = row['support'][key][j]
+                shard['series'][sid] = full
+                valid = np.isfinite(y)
+                positive = y == 1
+                counts = dict(trainingObservations=int(valid.sum()), trainingParticipants=len(set(groups[valid].tolist())),
+                    positiveObservations=int(positive.sum()), positiveParticipants=len(set(groups[positive].tolist())),
+                    queryCount=len(ids), availableEstimateCount=row['status'].count('ok'))
+                manifest['series'].append(dict(id=sid, featureId=f['id'], transformationId='probability',
+                    geometryId=geometry_id, estimatorId='nearest-case-raw', estimatorLabel='Nearest-case raw (k/T)',
+                    k=k, kMeaning='case_participants', scopeId='global', estimationId=policy_id,
+                    quantityLabel=f['label']+' — nearest-case estimate', unit='probability', shardId=shard_id,
+                    valueDomain='probability', counts=counts,
+                    limitations=[f'Unavailable where {k} positive-answer people cannot be reached. A person contributes the answer from their nearest answering visit, not any positive visit.']))
+                audit.append(dict(target=f['sourceName'], featureId=f['id'], geometryId=geometry_id, k=k,
+                    **counts, insufficientCases=row['status'].count('insufficient_cases'),
+                    reachedPeopleRange=[min(row['support']['participantCount']), max(row['support']['participantCount'])]))
+            if shard['series']:
+                assert not any(d['id'] == shard_id for d in manifest['shards']), 'Do not replace a partial existing shard.'
+                outputs.append((shard_id, shard))
         print(weighting, 'complete', flush=True)
     shutil.copytree(args.base_catalogue, args.output)
     for shard_id, shard in outputs:
         path = args.output/'features'/(shard_id+'.json')
         write(path, shard)
         manifest['shards'].append(dict(id=shard_id, **descriptor(args.output, path)))
-    provenance = dict(version=1, revision=policy_id, k=K, estimator='40/T',
+    provenance = dict(version=1, revision='profile-nearest-case-grid-v1', caseSizes=sizes, estimator='k/T',
         sourceManifestSha256=sha(args.base_catalogue/'manifest.json'),
         registrySha256={name: sha(args.registry/name) for name in ['targets.npz', 'targets.json', 'feature_dictionary.json']},
-        inputs=inputs, scriptSha256=sha(__file__), support=audit,
+        inputs=inputs, scriptSha256=sha(__file__), support=audit, reusedSeries=reused,
         threads=1, memoryBudgetGiB=2, modelsRefitted=False)
-    manifest['profileOutcomeEstimates'] = provenance
-    doc = args.output/'documentation/profile-outcomes.md'
+    manifest['profileOutcomeNeighborhoods'] = provenance
+    doc = args.output/'documentation/profile-outcomes-k-grid.md'
     shutil.copyfile(Path(__file__).with_name('PROFILE_OUTCOMES.md'), doc)
+    for previous_doc in manifest['documentation']:
+        if previous_doc['id'] == 'profile-outcomes':
+            previous_doc['id'] = 'profile-outcomes-archive-'+sha(args.base_catalogue/'manifest.json')[:12]
     manifest['documentation'].append(dict(id='profile-outcomes', label='Nearest-case estimates in joint-profile spaces', **descriptor(args.output, doc)))
     write(args.output/'manifest.json', manifest)
     # The old validation receipt belongs to the unchanged base. Preserve it, but
     # require a new validator receipt before this additive export can be installed.
-    (args.output/'validation.json').rename(args.output/'base-validation.json')
-    write(args.output/'profile-outcomes-audit.json', provenance)
+    (args.output/'validation.json').rename(args.output/('base-validation-'+sha(args.base_catalogue/'manifest.json')[:12]+'.json'))
+    write(args.output/'profile-outcome-neighborhoods-audit.json', provenance)
     print(json.dumps(audit, indent=2))
 
 
