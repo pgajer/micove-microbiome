@@ -1,11 +1,17 @@
 // Optional, frozen visit-by-cluster representation. Existing maps remain intact.
 const jointEmbeddingModels=new WeakMap();
+function jointEmbeddingChoices(asset=estimateAsset()){
+ const descriptors=asset?.profileEmbeddings||[];
+ const preferred=asset?.datasetId==='lsvf-v3v4-20241111'&&descriptors.find(d=>d.id==='lsvf-joint-outcome-excluded-euclidean-v1');
+ return preferred?[preferred,...descriptors.filter(d=>d!==preferred)]:descriptors.slice();
+}
 function jointEmbeddingModel(){
  const asset=estimateAsset(),descriptors=asset?.profileEmbeddings;if(!descriptors?.length)return null;
  if(jointEmbeddingModels.has(asset))return jointEmbeddingModels.get(asset);
  const key='micove-profile-representation:'+asset.datasetId+'@'+asset.revision+':representations';let saved;
- try{saved=JSON.parse(localStorage.getItem(key))||JSON.parse(localStorage.getItem('micove-profile-representation:'+asset.datasetId+'@'+asset.revision+':'+descriptors[0].id))}catch{}
- const selectedId=descriptors.some(d=>d.id===saved?.selectedId)?saved.selectedId:descriptors[0].id;
+ try{saved=JSON.parse(localStorage.getItem(key))}catch{}
+ if(!saved)try{const legacy=JSON.parse(localStorage.getItem('micove-profile-representation:'+asset.datasetId+'@'+asset.revision+':'+descriptors[0].id));if(legacy)saved={...legacy,selectedId:descriptors[0].id}}catch{}
+ const selectedId=descriptors.some(d=>d.id===saved?.selectedId)?saved.selectedId:jointEmbeddingChoices(asset)[0].id;
  const model={key,selectedId,choice:saved?.choice==='profiles'?'profiles':'composition',cameras:saved?.cameras||{},loaded:new Map(),promises:new Map(),get data(){return this.loaded.get(this.selectedId)?.data||null},get index(){return this.loaded.get(this.selectedId)?.index}};
  if(model.cameras.profiles&&!model.cameras[selectedId])model.cameras[selectedId]=model.cameras.profiles;
  jointEmbeddingModels.set(asset,model);return model;
@@ -32,7 +38,7 @@ function jointEmbeddingSync(){
   el('sampleRepresentation').onchange=async()=>{const m=jointEmbeddingModel();if(!m)return;const old=jointEmbeddingCameraKey();m.cameras[old]=copyCamera(readCamera('samples'));const value=el('sampleRepresentation').value;m.choice=value==='composition'?'composition':'profiles';if(m.choice==='profiles')m.selectedId=value;jointEmbeddingSave();syncEmbeddingChoices();jointEmbeddingSync();try{await refreshSamples(m.cameras[jointEmbeddingCameraKey()]||defaultCamera)}catch(e){el('sampleStatus').textContent=e.message}};
   el('findFeatureClusters').onclick=()=>jointFeatureSearch().catch(e=>{el('jointEmbeddingNote').textContent=e.message});el('jointEmbeddingMethods').onclick=jointEmbeddingMethods;
  }
- const m=jointEmbeddingModel(),active=jointEmbeddingActive();box.hidden=!m;if(m){const select=el('sampleRepresentation');select.replaceChildren(...[{id:'composition',label:'Taxonomic composition'},...estimateAsset().profileEmbeddings].map(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.label;return o}));select.value=active?m.selectedId:'composition';el('jointEmbeddingNote').textContent=active?(m.data?m.data.snapshot.clusters.length+' frozen joint-cluster profiles · Euclidean metric MDS. '+jointEmbeddingInterpretation(m.data):'Loading saved profile representation…'):'Choose a separate map of visits by their joint-cluster profiles, or keep the existing taxonomic maps.';el('jointEmbeddingMethods').hidden=!active}
+ const m=jointEmbeddingModel(),active=jointEmbeddingActive();box.hidden=!m;if(m){const select=el('sampleRepresentation');select.replaceChildren(...[{id:'composition',label:'Taxonomic composition'},...jointEmbeddingChoices()].map(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.label;return o}));select.value=active?m.selectedId:'composition';el('jointEmbeddingNote').textContent=active?(m.data?m.data.snapshot.clusters.length+' frozen joint-cluster profiles · Euclidean metric MDS. '+jointEmbeddingInterpretation(m.data):'Loading saved profile representation…'):'Choose a separate map of visits by their joint-cluster profiles, or keep the existing taxonomic maps.';el('jointEmbeddingMethods').hidden=!active}
 
  for(const id of ['sampleMethod','unfoldFaces','unfoldAnchor']){const node=el(id);if(node)node.closest('label').hidden=active||(id!=='sampleMethod'&&node.closest('label').hidden)}
  if(el('participantEmbeddingMode')){el('participantEmbeddingMode').disabled=active;el('participantEmbeddingMode').title=active?'This pilot uses one fixed population profile map; participant views restrict that map.':''}
@@ -98,7 +104,7 @@ async function jointFeatureSearch(){
  dialog.innerHTML='<button id="closeFindFeature" type="button" style="float:right">Close</button><h2>Find feature in clusters</h2><label>Cluster definition <select id="findFeatureDefinition"></select></label><p id="findFeatureScope"></p><label for="findFeatureQuery">Feature name (for example, any STI)</label><input id="findFeatureQuery" type="search" placeholder="any STI" autocomplete="off"><div id="findFeatureResults" aria-live="polite"></div>';
  const current=estimateCorrelationShown?.asset===asset&&estimateCorrelationShown.state.clusteringScope==='joint'?estimateCorrelationShown:null;
  if(current){const o=document.createElement('option');o.value='current';o.textContent='Current joint heatmap clusters';el('findFeatureDefinition').append(o)}
- const embeddings={};for(const d of asset.profileEmbeddings){embeddings[d.id]=await jointEmbeddingLoad(d.id);const o=document.createElement('option');o.value=d.id;o.textContent=d.label+' · frozen definition';el('findFeatureDefinition').append(o)}
+ const embeddings={};for(const d of jointEmbeddingChoices(asset)){embeddings[d.id]=await jointEmbeddingLoad(d.id);const o=document.createElement('option');o.value=d.id;o.textContent=d.label+' · frozen definition';el('findFeatureDefinition').append(o)}
  const snapshots=Object.fromEntries(Object.entries(embeddings).map(([id,e])=>[id,e.snapshot]));snapshots.current=current?jointProfileSnapshot(current):null;el('findFeatureDefinition').value=embedding.id;
  const draw=()=>{
   const source=el('findFeatureDefinition').value,snapshot=snapshots[source],fields=asset.correlations.fields,query=el('findFeatureQuery').value;

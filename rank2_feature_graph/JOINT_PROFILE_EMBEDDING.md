@@ -14,6 +14,13 @@ cohort and participant selections restrict the fixed profile map. They do not
 refit it. Coloring, navigation and PNG export work in either representation.
 Taxonomic reference vertices and face unfolding apply only to composition space.
 
+For LSVF, **Outcomes excluded** is the default joint-profile definition and
+appears first among the profile representations. An explicitly saved choice of
+the original map is still restored, including older single-map preferences and
+named views. With no saved representation, the viewer still opens in taxonomic
+composition space. This preference changes neither selections nor coloring.
+Installations with only the original supplement continue to use that map.
+
 **Find feature in clusters…** searches recorded feature names. For example,
 “any STI” finds **Any incident STI**. It is excluded from the new clustering
 and remains available for coloring. The original definition retains it in C9.

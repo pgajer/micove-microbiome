@@ -50,8 +50,47 @@ asset.profileEmbeddings.push({id:'excluded',sha256:'new',http:{}});
 ctx.VME_ASSETS.group=async key=>structuredClone(key.endsWith(':new')?outcomeExcluded:data);
 ctx.jointEmbeddingRestore({id:'excluded',choice:'profiles'});await ctx.jointEmbeddingEnsure();
 assert.equal(ctx.jointEmbeddingSnapshot().id,'excluded');assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),outcomeExcluded.coordinates);
+const excludedTraces=ctx.jointEmbeddingTransform(source,layout).traces;
+assert.deepEqual(plain(excludedTraces[0].ids),plain(transformed.traces[0].ids),'Switching representations retains selected samples');
+assert.deepEqual(plain(excludedTraces[0].marker),plain(transformed.traces[0].marker),'Switching representations retains colors and appearance');
 assert.match(ctx.jointEmbeddingInterpretation(ctx.jointEmbeddingModel().data),/excluded.*available for coloring/);
 ctx.jointEmbeddingRestore({id:'test',choice:'profiles'});await ctx.jointEmbeddingEnsure();
 assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),data.coordinates,'Original map remains byte-equivalent after switching');
 assert.equal(ctx.jointEmbeddingSnapshot().id,'test');
 console.log('PASS: multiple frozen representations, saved identity, separate coordinate caches and original map preservation.');
+
+// Default ordering is independent of immutable catalogue order and explicit preferences.
+const originalId='lsvf-joint39-euclidean-v1',excludedId='lsvf-joint-outcome-excluded-euclidean-v1';
+const lsvf={datasetId:'lsvf-v3v4-20241111',revision:'v4',profileEmbeddings:[{id:originalId},{id:excludedId}]};
+const prefix='micove-profile-representation:'+lsvf.datasetId+'@'+lsvf.revision;
+function preferences(a=lsvf,entries=[]){
+ const values=new Map(entries),context=vm.createContext({estimateAsset:()=>a,localStorage:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)}});
+ vm.runInContext(fs.readFileSync(new URL('./joint_profile_embedding.js',import.meta.url),'utf8'),context);
+ return {context,values,model:context.jointEmbeddingModel()};
+}
+const fresh=preferences();
+assert.equal(fresh.model.selectedId,excludedId);assert.equal(fresh.model.choice,'composition');
+assert.deepEqual(plain(fresh.context.jointEmbeddingChoices()).map(d=>d.id),[excludedId,originalId]);
+assert.deepEqual(lsvf.profileEmbeddings.map(d=>d.id),[originalId,excludedId],'Catalogue order remains unchanged');
+for(const selectedId of [originalId,excludedId]){
+ const saved={choice:'profiles',selectedId,cameras:{[selectedId]:{eye:{x:2,y:3,z:4}}}};
+ const restored=preferences(lsvf,[[prefix+':representations',JSON.stringify(saved)]]);
+ assert.equal(restored.model.selectedId,selectedId);assert.equal(restored.model.choice,'profiles');
+ restored.context.jointEmbeddingSave();
+ const reloaded=preferences(lsvf,[...restored.values]);
+ assert.deepEqual(plain(reloaded.context.jointEmbeddingSnapshot()),{id:selectedId,choice:'profiles'});
+ assert.deepEqual(plain(reloaded.model.cameras),saved.cameras);
+}
+const stale=preferences(lsvf,[[prefix+':representations',JSON.stringify({choice:'profiles',selectedId:'missing'})]]);
+assert.equal(stale.model.selectedId,excludedId);assert.equal(stale.model.choice,'profiles');
+const legacyCamera={eye:{x:3,y:2,z:1}},legacy=preferences(lsvf,[[prefix+':'+originalId,JSON.stringify({choice:'profiles',cameras:{profiles:legacyCamera}})]]);
+assert.equal(legacy.model.selectedId,originalId);assert.equal(legacy.model.choice,'profiles');
+assert.deepEqual(plain(legacy.model.cameras[originalId]),legacyCamera);
+legacy.context.jointEmbeddingSave();
+assert.equal(preferences(lsvf,[...legacy.values]).model.selectedId,originalId);
+assert.equal(preferences({...lsvf,profileEmbeddings:[lsvf.profileEmbeddings[0]]}).model.selectedId,originalId);
+assert.equal(preferences({...lsvf,datasetId:'other'}).model.selectedId,originalId);
+assert.equal(preferences({...lsvf,profileEmbeddings:[]}).model,null);
+fresh.context.jointEmbeddingRestore({id:originalId,choice:'profiles'});
+assert.equal(fresh.model.selectedId,originalId,'Explicit named views retain the original map');
+console.log('PASS: outcome-excluded LSVF default, legacy and explicit saved maps, camera persistence, catalogue preservation and other-dataset fallback.');
