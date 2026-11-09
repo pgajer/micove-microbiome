@@ -13,7 +13,14 @@ Choose **Representation → Joint profiles · Outcomes excluded · Equal feature
 sidebar. **Taxonomic composition** returns to the existing embeddings. State,
 cohort and participant selections restrict the fixed profile map. They do not
 refit it. Coloring, navigation and PNG export work in either representation.
-Taxonomic reference vertices and face unfolding apply only to composition space.
+Reference vertices identify the original observed taxon-reference specimens at
+their saved positions in each profile map. These are specimen landmarks, not
+pure-taxon corners or feature-cluster representatives. Label percentages retain
+the original observed taxon abundances. References without saved coordinates
+are omitted and named in the Reference vertices section; no substitutes or
+projections are used. Their markers and labels use the shared visibility, sphere,
+size, color and lighting controls and stay outside sample counts and error
+evaluations. Face unfolding applies only to composition space.
 
 For LSVF, **Outcomes excluded · Equal features** is the default joint-profile definition and
 appears first among the profile representations. An explicitly saved choice of

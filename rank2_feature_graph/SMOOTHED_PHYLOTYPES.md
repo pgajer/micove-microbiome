@@ -109,8 +109,13 @@ a convergence certificate.
 Choose a saved map under Representation. Existing embeddings, state memberships,
 colors and selections are preserved. Selections and participant trajectories
 restrict population coordinates; they do not trigger local refits. Reference
-taxon markers are omitted because no independent smoothed reference positions
-were fitted. Existing outcome colors remain their original fields, with their
+taxon markers identify the original observed reference specimens at their saved
+smoothed positions. They are not pure-taxon corners; label percentages retain
+the original observed abundances, not the smoothed values. References lacking
+saved coordinates are omitted and named in the Reference vertices section; no
+substitutes or projections are used. Markers stay outside sample counts and
+distance-error evaluations. The shared visibility, sphere, size, color and
+lighting controls apply in these maps too. Existing outcome colors remain their original fields, with their
 original estimation spaces; they are not refitted on these maps. Representation
 methods provides formulas and Print / save PDF.
 
