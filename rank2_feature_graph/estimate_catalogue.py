@@ -479,6 +479,9 @@ def validate_profile_embeddings(folder, manifest):
         require(snapshot.get('scope', {}).get('records') == len(records)
                 and data.get('excludedRecords') == manifest['sampleCount'] - len(records)
                 and data.get('weighting') in ('features', 'groups'), 'profile scope or weighting differs')
+        if 'weighting' in descriptor:
+            require(descriptor['weighting'] == data['weighting'],
+                    'profile descriptor weighting differs')
         for key, width in [('coordinates', 3), ('profileScores', len(clusters))]:
             matrix = data.get(key)
             require(isinstance(matrix, list) and len(matrix) == len(records)

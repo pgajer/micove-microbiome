@@ -59,6 +59,21 @@ assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),data.coordina
 assert.equal(ctx.jointEmbeddingSnapshot().id,'test');
 console.log('PASS: multiple frozen representations, saved identity, separate coordinate caches and original map preservation.');
 
+const equalGroups={...structuredClone(outcomeExcluded),id:'excluded-groups',weighting:'groups',coordinates:[[21,22,23],[24,25,26],[27,28,29]]};
+asset.profileEmbeddings.push({id:'excluded-groups',sha256:'groups',http:{}});
+ctx.VME_ASSETS.group=async key=>structuredClone(key.endsWith(':groups')?equalGroups:key.endsWith(':new')?outcomeExcluded:data);
+ctx.jointEmbeddingRestore({id:'excluded-groups',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+const groupTraces=ctx.jointEmbeddingTransform(source,layout).traces;
+assert.deepEqual(plain(groupTraces[0].x),[21,24,27]);
+assert.deepEqual(plain(groupTraces[0].ids),plain(excludedTraces[0].ids));
+assert.deepEqual(plain(groupTraces[0].marker),plain(excludedTraces[0].marker),'Profile weighting preserves current coloring');
+assert.equal(ctx.jointEmbeddingWeightingLabel(equalGroups),'Equal feature-group weights');
+assert.equal(ctx.jointEmbeddingWeightingLabel(outcomeExcluded),'Equal feature weights');
+ctx.jointEmbeddingRestore({id:'excluded',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates),outcomeExcluded.coordinates,'Equal-feature coordinates remain intact');
+assert.equal(JSON.stringify(source),frozen);
+console.log('PASS: independent equal-group map identity, coordinates, selection and color preservation.');
+
 // Default ordering is independent of immutable catalogue order and explicit preferences.
 const originalId='lsvf-joint39-euclidean-v1',excludedId='lsvf-joint-outcome-excluded-euclidean-v1';
 const lsvf={datasetId:'lsvf-v3v4-20241111',revision:'v4',profileEmbeddings:[{id:originalId},{id:excludedId}]};
@@ -72,6 +87,13 @@ const fresh=preferences();
 assert.equal(fresh.model.selectedId,excludedId);assert.equal(fresh.model.choice,'composition');
 assert.deepEqual(plain(fresh.context.jointEmbeddingChoices()).map(d=>d.id),[excludedId,originalId]);
 assert.deepEqual(lsvf.profileEmbeddings.map(d=>d.id),[originalId,excludedId],'Catalogue order remains unchanged');
+const balancedId='lsvf-joint-outcome-excluded-equal-groups-euclidean-v1';
+const threeMaps={...lsvf,profileEmbeddings:[{id:originalId},{id:excludedId,exclusionPolicyId:'policy'},{id:balancedId,exclusionPolicyId:'policy'}]};
+const three=preferences(threeMaps);
+assert.deepEqual(plain(three.context.jointEmbeddingChoices()).map(d=>d.id),[excludedId,balancedId,originalId]);
+assert.equal(three.model.selectedId,excludedId,'Equal-feature outcome-excluded default remains unchanged');
+three.context.jointEmbeddingRestore({id:balancedId,choice:'profiles'});
+assert.equal(preferences(threeMaps,[...three.values]).model.selectedId,balancedId,'Equal-group choice persists separately');
 for(const selectedId of [originalId,excludedId]){
  const saved={choice:'profiles',selectedId,cameras:{[selectedId]:{eye:{x:2,y:3,z:4}}}};
  const restored=preferences(lsvf,[[prefix+':representations',JSON.stringify(saved)]]);

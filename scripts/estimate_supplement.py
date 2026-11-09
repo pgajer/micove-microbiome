@@ -51,6 +51,11 @@ REVIEWED['fa6a6bcb0a73a8dce1de4f4eea654594e9447dbf761329b2e3964b40c09c98dc'] = {
     **REVIEWED['7e27bc891b10f3b041b35495c3ca0f692592cd9782454f08f2234acef984044e'],
 }
 
+# Additive equal-feature-group profile map; both previous maps and estimates retained.
+REVIEWED['40d3c286b6e352e563583710aa6cef1b9d04fe6620cadcaef9b8e1cacf6df9e5'] = {
+    **REVIEWED['fa6a6bcb0a73a8dce1de4f4eea654594e9447dbf761329b2e3964b40c09c98dc'],
+}
+
 
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""

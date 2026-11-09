@@ -91,6 +91,17 @@ class EstimateCatalogueTests(unittest.TestCase):
         self.load()
         self.assertEqual(before, self.shards)
 
+    def test_profile_weighting_is_validated_when_declared(self):
+        self.profile_embedding_fixture(lambda d: (d.update(weighting='groups'),
+                                                  d['settings'].update(weighting='groups')))
+        self.manifest['profileEmbeddings'][0]['weighting'] = 'groups'
+        self.write()
+        self.load()
+        self.manifest['profileEmbeddings'][0]['weighting'] = 'features'
+        self.write()
+        with self.assertRaisesRegex(ValueError, 'descriptor weighting'):
+            self.load()
+
     def test_profile_exclusion_policy_is_enforced_without_removing_color_targets(self):
         self.profile_embedding_fixture()
         policy = dict(id='outcome-excluded', label='Outcomes excluded',

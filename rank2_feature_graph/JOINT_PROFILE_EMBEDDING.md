@@ -7,19 +7,33 @@ and clinical patterns lie near one another? This representation places **visits*
 in three dimensions. Its input columns are feature-cluster profiles; the feature
 clusters themselves are not the plotted points.
 
-Choose **Representation → Joint profiles · Outcomes excluded** or
+Choose **Representation → Joint profiles · Outcomes excluded · Equal features**,
+**Joint profiles · Outcomes excluded · Equal groups**, or
 **Joint profiles · Original (outcomes included)** at the top of the sample
 sidebar. **Taxonomic composition** returns to the existing embeddings. State,
 cohort and participant selections restrict the fixed profile map. They do not
 refit it. Coloring, navigation and PNG export work in either representation.
 Taxonomic reference vertices and face unfolding apply only to composition space.
 
-For LSVF, **Outcomes excluded** is the default joint-profile definition and
+For LSVF, **Outcomes excluded · Equal features** is the default joint-profile definition and
 appears first among the profile representations. An explicitly saved choice of
 the original map is still restored, including older single-map preferences and
 named views. With no saved representation, the viewer still opens in taxonomic
 composition space. This preference changes neither selections nor coloring.
 Installations with only the original supplement continue to use that map.
+
+The two outcome-excluded maps use exactly the same 38 clusters and visits.
+**Equal features** takes the ordinary median of a cluster's feature percentiles.
+**Equal groups** gives each feature group represented in that cluster the same
+total weight, divided among its member features, then takes a weighted median.
+These groups are assay/feature types, such as immune markers and metabolites;
+they are not different cohorts. A cluster containing features from only one
+group has the same profile under both definitions.
+
+Selecting a representation changes coordinates only. The separate **Weight
+feature groups equally** checkbox controls cluster-profile coloring and does
+not change the selected map. Thus either geometry can be colored by the same
+individual feature or by either color-profile definition.
 
 **Find feature in clusters…** searches recorded feature names. For example,
 “any STI” finds **Any incident STI**. It is excluded from the new clustering
@@ -54,6 +68,25 @@ error is **19.84%**, versus **35.61%** for its initial PCA projection, over
 1,929,628 positive-distance pairs; two zero-distance pairs are excluded.
 These numbers evaluate a different target geometry from the original map and
 are not a head-to-head improvement claim.
+
+The equal-group map uses the same 1,965 visits, 1,144 participants and 38
+clusters. Twenty-two clusters contain multiple feature groups; weighting changes
+at least one profile value in 21 clusters. Single-group profiles remain unchanged.
+Both fits use the same solver settings and seed. The equal-feature fit is reused
+after exact input-matrix and runtime-provenance verification.
+
+| Outcome-excluded profile definition | RMS relative distance error | Positive-distance pairs | Zero-distance pairs |
+| --- | ---: | ---: | ---: |
+| Equal features | 19.84% | 1,929,628 | 2 |
+| Equal groups | 23.31% | 1,929,629 | 1 |
+
+Independent calculations verify every profile and each all-pairs error. Each
+error measures approximation of that definition's own target distances; these
+values do not select a scientifically preferable weighting. One pair of visits
+with identical equal-feature profiles differs under equal-group weighting, so
+the number of positive-distance pairs differs by one. The equal-group fit has
+1,964 distinct vectors and a three-component PCA baseline error of 41.53%.
+Both representations omit the same 26 visits without common estimate support.
 
 Retained pairwise correlations are reused exactly. The excluded rows/columns
 are removed before rebuilding each hierarchy; the original all-field hierarchy
@@ -96,11 +129,27 @@ The indicator is one when its condition holds and zero otherwise. Tied values
 receive half their combined reference weight. Every participant contributes
 total weight one to the percentile reference.
 
-For cluster c, the pilot profile S_vc is the ordinary median of its members'
+For cluster c, the equal-feature profile S_vc is the ordinary median of its members'
 percentiles at visit v. An even-sized cluster uses the mean of the middle two.
-Every feature has equal weight **within** its cluster. The separate equal-group
-coloring option does not alter the saved embedding. Percentiles and membership
+Every feature has equal weight **within** its cluster. Percentiles and membership
 stay fixed when samples are selected.
+
+For the equal-group representation, feature f in cluster c receives weight
+
+\[
+a_{fc}=\frac{1}{G_c n_{g(f),c}},\qquad
+S_{vc}=\operatorname{weighted\ median}_{f\in c}(p_{fv};a_{fc}).
+\]
+
+G_c counts the feature groups present in the cluster; g(f) identifies a
+feature's group; n_{g(f),c} counts that group's members in this cluster.
+For example, ten metabolites and two immune markers give each group half
+the weight: 5% per metabolite and 25% per immune marker. Sort percentiles from
+low to high and accumulate these weights; the weighted median is where the
+total crosses one half. At an exact half-weight split, average the two bounding
+values. This is a weighted median of individual features, not a median of group
+medians. No sign is reversed. The participant weights used to calculate feature
+percentiles are identical in both representations.
 
 The target distance between visits i and j is
 
@@ -108,8 +157,11 @@ The target distance between visits i and j is
 d_{ij}=\sqrt{\sum_{c=1}^{G}(S_{ic}-S_{jc})^2}.
 \]
 
-Here G is the number of clusters: 39 in the original pilot, 38 in the
-outcome-excluded map. Every cluster dimension receives equal weight. Scores remain on their original
+Here G is the number of clusters: 39 in the original pilot, 38 in either
+outcome-excluded map. Every cluster dimension receives equal weight, including
+in the equal-group representation. Weighting changes each cluster's profile;
+it does not balance feature groups across the full distance calculation.
+Scores remain on their original
 0–100 percentile scale: no row normalization, variance standardization,
 whitening or winsorization is applied. Color clipping changes display only.
 
