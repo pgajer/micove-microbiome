@@ -145,3 +145,62 @@ assert.equal(preferences({...lsvf,profileEmbeddings:[]}).model,null);
 fresh.context.jointEmbeddingRestore({id:originalId,choice:'profiles'});
 assert.equal(fresh.model.selectedId,originalId,'Explicit named views retain the original map');
 console.log('PASS: outcome-excluded LSVF default, legacy and explicit saved maps, camera persistence, catalogue preservation and other-dataset fallback.');
+
+// The method menu defaults to direct averages, while saved alternatives remain exact.
+const smoothedVariants=['l1-euclidean','max-raw-euclidean','max-post-euclidean','max-raw-linf','max-post-linf'];
+const smoothedDescriptors=smoothedVariants.map(variant=>({id:'lsvf-smoothed-k40-'+variant+'-v1',label:'Smoothed phylotypes · '+variant+(variant.includes('raw')?' · No post-normalization':''),sha256:variant,http:{}}));
+const allMaps={...threeMaps,smoothedEmbeddings:smoothedDescriptors};
+const menus=preferences(allMaps),unchangedCatalogue=JSON.stringify(allMaps);
+assert.deepEqual(plain(menus.context.jointEmbeddingMenuChoices()).map(d=>d.id),[excludedId,balancedId,originalId,...smoothedDescriptors.filter(d=>!d.id.includes('-post-')).map(d=>d.id)]);
+assert.equal(JSON.stringify(allMaps),unchangedCatalogue);
+assert.equal(menus.model.selectedId,excludedId,'Global joint-profile default remains unchanged');
+for(const metric of ['euclidean','linf']){
+ const raw='lsvf-smoothed-k40-max-raw-'+metric+'-v1',post=raw.replace('-raw-','-post-');
+ assert.equal(menus.context.smoothedEmbeddingPair(post).raw.id,raw);
+ const restored=preferences(allMaps,[[prefix+':representations',JSON.stringify({choice:'profiles',selectedId:post})]]);
+ assert.equal(restored.model.selectedId,post,'Explicit saved post-normalized choice is reproducible');
+ restored.context.jointEmbeddingRestore({id:post,choice:'profiles'});
+ assert.equal(restored.context.jointEmbeddingSnapshot().id,post,'Named post-normalized views remain exact');
+}
+const incomplete={...allMaps,smoothedEmbeddings:smoothedDescriptors.filter(d=>!d.id.includes('-raw-'))};
+assert.deepEqual(plain(preferences(incomplete).context.jointEmbeddingMenuChoices()).map(d=>d.id),[excludedId,balancedId,originalId,...incomplete.smoothedEmbeddings.map(d=>d.id)],'An unpaired alternative is not hidden');
+
+// Exercise the real menu and checkbox handlers with identity-tagged sample traces.
+asset.smoothedEmbeddings=smoothedDescriptors;
+const variantData=Object.fromEntries(smoothedDescriptors.map((d,i)=>[d.sha256,{...structuredClone(smooth),id:d.id,normalization:i?'max':'l1',postMaxNormalization:d.id.includes('-post-'),targetMetric:d.id.includes('linf')?'linf':'euclidean',coordinates:smooth.coordinates.map(p=>p.map(v=>v+i))}]));
+ctx.VME_ASSETS.group=async key=>structuredClone(variantData[key.split(':').at(-1)]||data);
+const ui=new Map();
+class Node{
+ constructor(id=''){this.id=id;this.dataset={};this.children=[];this.hidden=false;this.checked=false}
+ set innerHTML(text){this.html=text;for(const match of text.matchAll(/id="([^"]+)"/g))ui.set(match[1],new Node(match[1]))}
+ prepend(node){this.children.unshift(node);ui.set(node.id,node)}
+ append(node){this.children.push(node)}
+ replaceChildren(...nodes){this.children=nodes}
+ closest(){return this.parent??={hidden:false}}
+}
+for(const id of ['sampleViewControls','sampleMethod','unfoldFaces','unfoldAnchor','participantEmbeddingMode','sampleStatus','sampleTitle'])ui.set(id,new Node(id));
+ctx.el=id=>ui.get(id)||null;
+ctx.document={createElement:()=>new Node(),head:new Node()};
+ctx.syncEmbeddingChoices=()=>{};ctx.defaultCamera={eye:{x:1,y:1,z:1}};
+let rendered;
+ctx.refreshSamples=async()=>{await ctx.jointEmbeddingEnsure();rendered=ctx.jointEmbeddingTransform(source,layout);ctx.jointEmbeddingSync()};
+ctx.jointEmbeddingSync();
+for(const metric of ['euclidean','linf']){
+ const raw='lsvf-smoothed-k40-max-raw-'+metric+'-v1',post=raw.replace('-raw-','-post-'),select=ui.get('sampleRepresentation'),box=ui.get('smoothedPostNormalize');
+ select.value=raw;await select.onchange();
+ assert.equal(ctx.jointEmbeddingSnapshot().id,raw);assert.equal(box.checked,false);assert.equal(ui.get('smoothedPostNormalizeControl').hidden,false);
+ const before=plain(rendered.traces[0]);
+ box.checked=true;await box.onchange();
+ assert.equal(ctx.jointEmbeddingSnapshot().id,post);assert.equal(select.value,raw);assert.equal(box.checked,true);
+ assert.deepEqual(plain(rendered.traces[0].ids),before.ids);assert.deepEqual(plain(rendered.traces[0].marker),before.marker);
+ assert.notDeepEqual(plain(rendered.traces[0].x),before.x,'Checkbox changes coordinates to the saved alternative');
+ ctx.jointEmbeddingRestore({id:post,choice:'profiles'});ctx.jointEmbeddingSync();assert.equal(box.checked,true);
+ box.checked=false;await box.onchange();assert.equal(ctx.jointEmbeddingSnapshot().id,raw);assert.deepEqual(plain(rendered.traces[0].x),before.x);
+ box.checked=true;await box.onchange();
+}
+ui.get('sampleRepresentation').value='lsvf-smoothed-k40-l1-euclidean-v1';await ui.get('sampleRepresentation').onchange();
+assert.equal(ui.get('smoothedPostNormalizeControl').hidden,true,'L1 has no post-max-normalization control');
+ui.get('sampleRepresentation').value='composition';await ui.get('sampleRepresentation').onchange();
+assert.equal(ui.get('smoothedPostNormalizeControl').hidden,true);assert.equal(rendered.traces,source);
+assert.equal(JSON.stringify(source),frozen);
+console.log('PASS: default direct averages, optional post-normalization, menu/checkbox handlers, saved alternatives, stable sample IDs and coloring.');

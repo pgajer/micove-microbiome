@@ -113,3 +113,11 @@ taxon markers are omitted because no independent smoothed reference positions
 were fitted. Existing outcome colors remain their original fields, with their
 original estimation spaces; they are not refitted on these maps. Representation
 methods provides formulas and Print / save PDF.
+
+The max-normalized Euclidean and L-infinity choices open with no
+post-normalization. Check **Post-normalize smoothed profiles** to display the
+corresponding saved alternative. Switching to another smoothed method starts with the
+direct averages. An explicitly saved post-normalized choice, including a named
+view, retains its original map and restores the checked box. L1 and joint-profile
+representations do not show this checkbox. These controls change only the saved
+coordinate map; they do not alter sample selections, memberships or coloring.
