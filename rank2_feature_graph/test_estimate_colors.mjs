@@ -126,3 +126,22 @@ assert.equal(JSON.stringify(plot.layout.scene),camera);assert.equal(JSON.stringi
 el('sampleColorScheme').value='pure';await run('estimateEnsure()');await run('estimateDrawColorbar()');
 assert.equal(plot.data[0].marker.showscale,null);assert.equal(JSON.stringify(plot.data.map(t=>t.marker.color)),originalColors);
 console.log('PASS: participant-response ratios/differences, zero-reference guard and exportable colorbar preserve samples and camera.');
+
+// Supplementary queries receive colors while old limits, coordinates and
+// selection stay fixed. The exclusion exception survives hover and export.
+el('sampleColorScheme').value='estimate:assay';
+asset.supplementaryEstimates={queryRecordIndices:[2],colorReferenceIndices:[0,1],policy:'Own participant cannot reliably be excluded.'};
+replies.set('two',{datasetId:'test',catalogueRevision:'pilot',sampleOrderSha256:asset.sampleOrderSha256,series:{b:{values:[.2,.8,1],status:['ok','ok','ok'],support:{participantCount:[10,10,10]}}}});
+run('estimateModel().rows.clear();estimateLoaded=null');
+await run('estimateEnsure()');
+assert.deepEqual(Array.from(run('estimateCurrent().row.colorReferenceIndices')),[0,1]);
+Array.from(run('estimateLimitsCached(estimateCurrent())')).forEach((v,i)=>assert.ok(Math.abs(v-[.215,.785][i])<1e-12));
+assert.notEqual(run('estimatePointColor(2)'),'#9ca3af');
+assert.match(run('estimateHover(2,estimateCurrent())'),/Own participant cannot reliably be excluded/);
+assert.doesNotMatch(run('estimateHover(0,estimateCurrent())'),/Participant-exclusion limitation/);
+run('estimateDownload=(text)=>{globalThis.csvResult=text}');run('estimateExport()');
+assert.match(context.csvResult,/participant_exclusion_note/);
+assert.match(context.csvResult,/"three"[^\n]+"not_guaranteed"/);
+assert.equal(JSON.stringify(plot.layout.scene),camera);
+assert.equal(JSON.stringify(selected),selectedBefore);
+console.log('PASS: supplementary-query coloring, fixed original limits and explicit hover/CSV exclusion warning.');

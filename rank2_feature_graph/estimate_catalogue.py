@@ -259,6 +259,22 @@ def validate_manifest(manifest, expected):
             require(integer(features[item['featureId']].get('featureIndex')),
                     'query-anchor exclusion needs the target taxon feature index')
     require(set(shards) == {s['shardId'] for s in series.values()}, 'unreferenced shard')
+    extension = manifest.get('supplementaryEstimates')
+    if extension is not None:
+        require(isinstance(extension, dict) and extension.get('version') == 1
+                and text(extension.get('policy')), 'invalid supplementary estimate policy')
+        queries, reference = extension.get('queryRecordIndices'), extension.get('colorReferenceIndices')
+        require(isinstance(queries, list) and isinstance(reference, list)
+                and queries and reference
+                and all(integer(i) and i < manifest['sampleCount'] for i in queries+reference)
+                and queries == sorted(set(queries)) and reference == sorted(set(reference))
+                and not set(queries).intersection(reference)
+                and set(queries+reference) == set(range(manifest['sampleCount'])),
+                'supplementary estimate references must partition the records')
+        require(extension.get('existingEstimatesUnchanged') is True
+                and extension.get('embeddingsUnchanged') is True
+                and extension.get('referencePopulationsUnchanged') is True,
+                'supplementary estimates must preserve the frozen reference')
     return dict(series=series, shards=shards, statuses=statuses, scopes=scopes, support=support,
                 features=features, assignments=assignments)
 
@@ -442,7 +458,7 @@ def validate_correlations(folder, manifest, context):
             require(all(math.isfinite(v) for v in values), 'nonfinite correlation inputs')
             if 'queryRecords' in data:
                 queries = data['queryRecords']
-                require(k == 40 and queries and queries == sorted(set(queries))
+                require(queries and queries == sorted(set(queries))
                         and all(integer(i) and i < manifest['sampleCount'] and i not in records for i in queries)
                         and text(data.get('queryPolicy')), 'invalid supplementary profile queries')
                 try:

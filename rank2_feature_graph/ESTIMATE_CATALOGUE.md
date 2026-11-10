@@ -593,3 +593,18 @@ enter those profiles. Legacy descriptors without this key remain supported.
 Representation selection, cameras and named views retain the specific map ID.
 The clustering policy also separates saved heatmap/profile settings so old
 cluster numbers cannot silently select different memberships.
+
+## Query-only estimates without subject identity
+
+A reviewed `supplementaryEstimates` manifest block identifies query record indices,
+the unchanged color-reference indices and the participant-exclusion policy. The
+two index sets partition the catalogue. Only the query entries in each shard
+may change; supported values retain `ok`, with the identity limitation recorded
+separately. Insufficient support and outside-scope entries remain null. The field
+CSV includes `participant_exclusion` and `participant_exclusion_note`. New
+queries never determine color limits, response means or correlation banks.
+
+Selection-input banks can additionally carry query-only field arrays at each
+available K. Their reference arrays, participant groups and clustering inputs
+remain unchanged. Profile representations and their numerical evaluations are
+independent immutable assets; extending color fields does not refit them.

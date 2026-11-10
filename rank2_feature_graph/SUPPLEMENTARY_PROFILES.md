@@ -74,8 +74,29 @@ positions. Labels retain their actual observed taxon abundances, not smoothed
 abundances. Hover text identifies their unknown-participant limitation.
 Reference markers do not add observations to counts or evaluation pairs.
 
-Saved K=40 joint-cluster profiles can color these supplementary specimens
-using the same frozen percentile reference. Other estimate catalogues are
-unchanged; a previously unavailable response estimate remains unavailable
-and is shown in gray. Unknown participant identity still prevents participant
-trajectory linkage and participant-level cross-validation for these records.
+Outcome and feature estimates are also available for these 26 query specimens,
+using every existing transformation, estimator, neighborhood size and scope.
+Abundance-space fields use the original L1–Euclidean distance; outcome estimates
+in joint-profile spaces use all 38 frozen profile columns, with the selected
+feature or group weighting. No distances are measured in the displayed 3D map.
+
+For nearest-people means, select the nearest answering visit from each known
+participant and average the first K people. For a binary outcome, the raw
+nearest-case estimate is k/T, where T counts answering people through the kth
+case. The corrected estimate is (k−1)/(T−1). Use the existing deterministic
+specimen-ID tie order. The query's recorded outcome is never needed to estimate
+its field. Within-state fields retain their existing pure-state scope and omit
+a taxon's own-anchor ratio. Insufficient support remains unavailable; there is
+no fallback to a smaller neighborhood or a different scope.
+
+All previously saved estimates and support values remain exactly unchanged.
+Reference response means and color limits use the original identified records,
+so the additional queries cannot change other specimens' colors. Joint-cluster
+colors at K = 10, 20, 40 and 80 use frozen reference percentiles. Correlation
+banks and cluster definitions still use only the identified reference records.
+Neither the new queries nor their estimates enter the training population.
+
+The sidebar, hover text and field CSV identify the participant-exclusion
+limitation. Unknown participant identity still prevents participant trajectory
+linkage and participant-level cross-validation for these records. These new
+query estimates are exploratory descriptions, not validated predictions.

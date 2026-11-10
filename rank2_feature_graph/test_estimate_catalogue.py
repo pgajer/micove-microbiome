@@ -11,6 +11,20 @@ from estimate_catalogue import checked_file, load_catalogue, order_hash, read_js
 
 
 class EstimateCatalogueTests(unittest.TestCase):
+    def test_query_estimates_require_disjoint_frozen_color_reference(self):
+        extension = dict(version=1, policy='Unknown participant: exclusion cannot be guaranteed.',
+            queryRecordIndices=[5], colorReferenceIndices=[0, 1, 2, 3, 4], existingEstimatesUnchanged=True,
+            embeddingsUnchanged=True, referencePopulationsUnchanged=True)
+        self.manifest['supplementaryEstimates'] = extension
+        validate_manifest(self.manifest, self.expected)
+        for key, value in [('colorReferenceIndices', [0, 1, 2, 3, 4, 5]),
+                           ('existingEstimatesUnchanged', False), ('policy', '')]:
+            original = extension[key]
+            extension[key] = value
+            with self.assertRaises(ValueError):
+                validate_manifest(self.manifest, self.expected)
+            extension[key] = original
+
     def supplementary_fixture(self, data):
         old_records = data['recordIndices'][:]
         query = next(i for i in range(data['sampleCount']) if i not in old_records)

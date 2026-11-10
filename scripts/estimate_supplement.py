@@ -79,6 +79,12 @@ REVIEWED['5b0c8f4c48740780f5701d3844381291d2e647cb2eeaa71e91cb1badb61abeb6'] = {
 }
 
 
+# Query-only color estimates; previous values, profiles and coordinates frozen.
+REVIEWED['c33da2328d290cd221e8c66fe47577d60b4f5b7a5b4dea743dfddc072c211c20'] = {
+    **REVIEWED['5b0c8f4c48740780f5701d3844381291d2e647cb2eeaa71e91cb1badb61abeb6'],
+}
+
+
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""
     if isinstance(value, dict):

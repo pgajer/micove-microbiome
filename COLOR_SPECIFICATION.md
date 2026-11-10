@@ -35,11 +35,13 @@ The active legend determines the meaning of color in a particular view.
 
 ## Sample coloring
 
-The supplementary-profile release adds K=40 joint-cluster profile colors for
-26 LSVF queries without subject IDs, using the unchanged participant-weighted
-percentile reference. These queries cannot guarantee exclusion of their own
-participant. Other saved outcome/response color estimates stay unchanged;
-previously unsupported values remain gray.
+LSVF query supplements extend saved outcome and feature fields to 26 specimens
+without subject IDs. These are queries only: their own participants cannot
+reliably be excluded. The sidebar, hover and CSV retain this limitation.
+Existing estimates, response means and color limits remain frozen on the
+1,965 identified reference specimens. Unsupported neighborhood sizes or scopes
+stay gray. Joint-cluster colors at K = 10, 20, 40 and 80 also support these
+queries without changing reference percentiles, correlations or clusters.
 
 LSVF **Joint-profile outcomes** uses saved participant-excluded raw
 nearest-case fields in the full outcome-excluded 38-profile geometry. Equal
