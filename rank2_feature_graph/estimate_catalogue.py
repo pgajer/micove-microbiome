@@ -440,6 +440,19 @@ def validate_correlations(folder, manifest, context):
             values = array.array('d'); values.frombytes(raw)
             if sys.byteorder != 'little': values.byteswap()
             require(all(math.isfinite(v) for v in values), 'nonfinite correlation inputs')
+            if 'queryRecords' in data:
+                queries = data['queryRecords']
+                require(k == 40 and queries and queries == sorted(set(queries))
+                        and all(integer(i) and i < manifest['sampleCount'] and i not in records for i in queries)
+                        and text(data.get('queryPolicy')), 'invalid supplementary profile queries')
+                try:
+                    raw = base64.b64decode(data.get('queryValuesBase64', ''), validate=True)
+                except (ValueError, TypeError) as exc:
+                    raise ValueError('invalid supplementary profile encoding') from exc
+                require(len(raw) == 8*len(queries)*len(fields), 'supplementary feature dimensions differ')
+                values = array.array('d'); values.frombytes(raw)
+                if sys.byteorder != 'little': values.byteswap()
+                require(all(math.isfinite(v) for v in values), 'nonfinite supplementary fields')
 
 
 def validate_correlation_exclusions(data):
@@ -453,6 +466,39 @@ def validate_correlation_exclusions(data):
     require(isinstance(rows, list) and rows and all(isinstance(r, dict)
             and r.get('featureId') in ids and text(r.get('reason')) for r in rows)
             and len({r['featureId'] for r in rows}) == len(rows), 'invalid excluded features')
+
+
+def validate_supplementary_positions(data):
+    """A map extension cannot silently redefine its original fit or reference."""
+    extension = data.get('supplementary')
+    if not extension:
+        return len(data['recordIndices'])
+    reference, queries = extension.get('referenceRecords'), extension.get('recordIndices')
+    require(extension.get('version') == 1 and isinstance(reference, list) and reference
+            and isinstance(queries, list) and queries
+            and data['recordIndices'] == reference+queries and not set(reference).intersection(queries)
+            and text(extension.get('policy')) and HASH.fullmatch(str(extension.get('parentSha256', '')))
+            and extension.get('method') == 'fixed-reference relative-distance least squares',
+            'invalid supplementary placement definition')
+    import struct
+    def matrix_hash(rows):
+        digest = hashlib.sha256()
+        for row in rows:
+            digest.update(struct.pack('<'+'d'*len(row), *row))
+        return digest.hexdigest()
+    for key, field in [('coordinates', 'originalCoordinatesSha256'), ('profileScores', 'originalProfilesSha256')]:
+        require(matrix_hash(data[key][:len(reference)]) == extension.get(field),
+                'supplementary placement changed original '+key)
+    require(matrix_hash(data['profileScores']) == extension.get('extendedProfilesSha256'), 'extended profile hash differs')
+    original = extension.get('originalEvaluation', {})
+    require(original.get('profiles') == len(reference) and number(original.get('relativeRms'))
+            and original.get('pairs', -1)+original.get('zeroPairs', -1) == len(reference)*(len(reference)-1)//2,
+            'original supplementary evaluation differs')
+    diagnostics = extension.get('diagnostics', [])
+    require([d.get('record') for d in diagnostics] == queries
+            and all(d.get('success') is True and number(d.get('relativeRms')) for d in diagnostics)
+            and number(extension.get('referencePairRelativeRms')), 'supplementary placement did not validate')
+    return len(reference)
 
 
 def validate_profile_embeddings(folder, manifest):
@@ -496,7 +542,8 @@ def validate_profile_embeddings(folder, manifest):
             excluded = {r['featureId'] for r in policy['excluded']}
             require(not any(fields[i]['featureId'] in excluded for i in members),
                     'excluded field entered profile embedding')
-        require(snapshot.get('scope', {}).get('records') == len(records)
+        reference_count = validate_supplementary_positions(data)
+        require(snapshot.get('scope', {}).get('records') == reference_count
                 and data.get('excludedRecords') == manifest['sampleCount'] - len(records)
                 and data.get('weighting') in ('features', 'groups'), 'profile scope or weighting differs')
         if 'weighting' in descriptor:
@@ -559,6 +606,7 @@ def validate_smoothed_embeddings(folder, manifest):
             matrix = data.get(key)
             require(isinstance(matrix, list) and len(matrix) == len(records)
                     and all(isinstance(row, list) and len(row) == width and all(number(v) for v in row) for row in matrix), 'invalid smoothed '+key)
+        validate_supplementary_positions(data)
         require(all(0 <= v <= 1+1e-12 for row in data['profileScores'] for v in row), 'invalid smoothed abundance range')
         if data['normalization'] == 'l1':
             require(all(abs(sum(row)-1) < 1e-10 for row in data['profileScores']), 'smoothed L1 closure differs')

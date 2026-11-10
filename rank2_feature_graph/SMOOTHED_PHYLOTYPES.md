@@ -2,17 +2,15 @@
 
 The LSVF smoothed-phylotype representations compare the geometry of locally
 averaged taxon profiles. A point still identifies an original visit. Its
-coordinates represent the average phylotype profile of 40 other participants.
+coordinates represent the average phylotype profile of 40 reference participants.
 All 559 phylotypes are retained, including constant fields and observed zeros.
 No outcomes, immune markers, metabolites or clinical fields enter these maps.
 
 ## Reference and neighborhoods
 
-The reference contains 1,965 visits from 1,144 participants. The 26 source records
-without participant identity have no participant-excluded smoothed coordinates;
-they remain available in the original dataset and taxonomic embeddings.
+The frozen reference contains 1,965 visits from 1,144 participants. The supplementary-profile release adds the 26 specimens without participant identity at new positions without moving any existing point. Their own participant cannot reliably be excluded from smoothing. See [supplementary profile methods](SUPPLEMENTARY_PROFILES.md).
 
-For each query visit, exclude all visits of its participant. Select each other
+For each identified query visit, exclude all visits of its participant. Select each other
 person's nearest visit, then retain the 40 closest people with equal weights.
 Use these same representatives for every phylotype. Exact distance ties use
 SHA-256 of `nearest-cases-v1|specimen ID`, then specimen ID. A tied shell may be

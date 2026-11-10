@@ -61,12 +61,17 @@ function jointProfileScores(input,members,sampleCount,fields=[],weighting='featu
  const featureWeights=jointProfileMemberWeights(members,fields,weighting);
  const bytes=Uint8Array.from(atob(input.valuesBase64),c=>c.charCodeAt(0)),view=new DataView(bytes.buffer),total=counts.size;
  if(bytes.length!==8*n*input.featureIds.length)throw Error('Joint-profile input dimensions differ.');
+ const queries=input.queryRecords||[],queryBytes=queries.length?Uint8Array.from(atob(input.queryValuesBase64),c=>c.charCodeAt(0)):new Uint8Array(),queryView=new DataView(queryBytes.buffer),queryRanks=[];
+ if(queryBytes.length!==8*queries.length*input.featureIds.length)throw Error('Joint-profile query dimensions differ.');
  const ranks=members.map(f=>{
   const values=Array.from({length:n},(_,i)=>view.getFloat64(8*(f*n+i),true));
   if(!values.every(Number.isFinite))throw Error('Joint profiles require common finite feature support.');
   const order=Array.from({length:n},(_,i)=>i).sort((a,b)=>values[a]-values[b]||a-b),result=new Float64Array(n);let mass=0;
+  const levels=[],before=[],after=[];
   for(let a=0;a<n;){let b=a,weight=0;while(b<n&&values[order[b]]===values[order[a]]){weight+=1/counts.get(input.participantGroups[order[b]]);b++}
+   levels.push(values[order[a]]);before.push(mass);after.push(mass+weight);
    const rank=100*(mass+weight/2)/total;for(let j=a;j<b;j++)result[order[j]]=rank;mass+=weight;a=b}
+  queryRanks.push(queries.map((_,i)=>{const value=queryView.getFloat64(8*(f*queries.length+i),true);if(!Number.isFinite(value))throw Error('Nonfinite joint-profile query.');let lo=0,hi=levels.length;while(lo<hi){const mid=(lo+hi)>>1;if(levels[mid]<value)lo=mid+1;else hi=mid}return 100*(lo===levels.length?mass:levels[lo]===value?(before[lo]+after[lo])/2:before[lo])/total}));
   return result;
  });
  const values=new Array(sampleCount).fill(null),status=new Array(sampleCount).fill('no_joint_support');
@@ -75,7 +80,8 @@ function jointProfileScores(input,members,sampleCount,fields=[],weighting='featu
   else{const sorted=percentiles.sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);values[r]=sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2}
   status[r]='ok';
  });
- return {values,status,referenceRecords:n,referenceParticipants:total,weighting,featureWeights};
+ queries.forEach((r,i)=>{if(!Number.isInteger(r)||r<0||r>=sampleCount||input.recordIndices.includes(r))throw Error('Joint-profile query index differs.');const p=queryRanks.map(v=>v[i]);values[r]=weighting==='groups'?jointProfileWeightedMedian(p,featureWeights):jointProfileWeightedMedian(p,p.map(()=>1));status[r]='ok'});
+ return {values,status,referenceRecords:n,referenceParticipants:total,weighting,featureWeights,queryRecords:queries,queryPolicy:input.queryPolicy,colorReferenceIndices:input.recordIndices};
 }
 async function jointProfilePrepare(){
  const asset=estimateAsset(),s={...estimateCorrelationState(),clusteringScope:'joint'},scope=estimateCorrelationScope(),data=asset.correlations;let bank;
@@ -165,7 +171,7 @@ function jointProfileLegend(entries){
  for(const e of entries){seen.add(e.key);if(c&&Number.isFinite(c.row.values[estimateIndex(e.index,e.record,e.profile)]))supported.add(e.key)}
  let html='<div class="estimateLegend"><strong>'+esc(definition?'C'+definition.id+' · '+jointProfileGroupCounts(definition):'Joint cluster profile')+'</strong><p>'+esc(jointProfileWeightingLabel(jointProfileModel().weighting))+' · median feature percentile · unitless summary of saved estimates, not an outcome probability.</p>';
  if(d?.limits)html+='<div class="estimateRamp" style="background:linear-gradient(to right,'+estimateViridis.join(',')+')"></div><div class="estimateEnds"><span>'+esc(d.format(d.limits[0]))+'</span><span>'+esc(d.format(d.limits[1]))+'</span></div><p>'+(estimateModel().clip?'Colors clipped at the 2.5th and 97.5th percentiles.':'Full profile range.')+' Hover values are unchanged. Color limits stay fixed across sample selections.</p>';
- html+='<p>'+esc(jointProfileDescription())+'</p><p>'+supported.size+' of '+seen.size+' displayed records have a profile. Gray: no common estimate support. Reference markers excluded.</p>'+(c?'<p>Percentile reference: '+c.row.referenceRecords+' visits from '+c.row.referenceParticipants+' equally weighted participants.</p>':'')+'</div>';
+ html+='<p>'+esc(jointProfileDescription())+'</p><p>'+supported.size+' of '+seen.size+' displayed records have a profile. Gray: no common estimate support. Reference markers excluded.</p>'+(c?'<p>Percentile reference: '+c.row.referenceRecords+' visits from '+c.row.referenceParticipants+' equally weighted participants.</p>'+(c.row.queryRecords?.length?'<p>'+c.row.queryRecords.length+' supplementary specimens without subject IDs use this frozen reference. Their own participant cannot reliably be excluded from smoothing.</p>':''):'')+'</div>';
  el('sampleLegend').hidden=false;el('sampleLegendItems').innerHTML=html;return true;
 }
 function jointProfileMethods(){
@@ -177,9 +183,9 @@ function jointProfileExportReady(){const c=estimateCurrent();return !!(c?.asset=
 async function jointProfileExport(){
  if(!jointProfileExportReady())throw Error('Wait for the selected color profile to finish loading.');
  const c=estimateCurrent();const m=jointProfileModel(),cluster=jointProfileDefinition(),fields=estimateAsset().correlations.fields;
- const definition={...m.snapshot,definitionSourceLabel:jointProfileDefinitionLabel(m.snapshot),selectedCluster:cluster.id,weighting:c.series.weighting,weightingLabel:jointProfileWeightingLabel(c.series.weighting),medianRule:'At an exact half-weight split, average the two bounding percentiles',features:cluster.members.map((i,j)=>({...fields[i],profileWeight:c.row.featureWeights[j]})),score:c.series.quantityLabel+' of participant-weighted mid-distribution feature percentiles (0–100)',reference:'Full common-support visit reference; participant weight 1, divided over visits',referenceRecords:c.row.referenceRecords,referenceParticipants:c.row.referenceParticipants,catalogueRevision:estimateAsset().revision,correlationRevision:estimateAsset().correlations.revision,sampleOrderSha256:estimateAsset().sampleOrderSha256,colorLimits:estimateLimitsCached(c),colorsClipped:estimateModel().clip};
+ const definition={...m.snapshot,definitionSourceLabel:jointProfileDefinitionLabel(m.snapshot),selectedCluster:cluster.id,weighting:c.series.weighting,weightingLabel:jointProfileWeightingLabel(c.series.weighting),medianRule:'At an exact half-weight split, average the two bounding percentiles',features:cluster.members.map((i,j)=>({...fields[i],profileWeight:c.row.featureWeights[j]})),score:c.series.quantityLabel+' of participant-weighted mid-distribution feature percentiles (0–100)',reference:'Full common-support visit reference; participant weight 1, divided over visits',referenceRecords:c.row.referenceRecords,referenceParticipants:c.row.referenceParticipants,catalogueRevision:estimateAsset().revision,correlationRevision:estimateAsset().correlations.revision,sampleOrderSha256:estimateAsset().sampleOrderSha256,colorLimits:estimateLimitsCached(c),colorsClipped:estimateModel().clip,supplementaryQueries:c.row.queryRecords||[],supplementaryPolicy:c.row.queryPolicy||null};
  const q=v=>'"'+String(v??'').replaceAll('"','""')+'"';
- const csv=[['sample_id','median_feature_percentile','status','weighting'],...estimateAsset().sampleIds.map((id,i)=>[id,c.row.values[i],c.row.status[i],c.series.weighting])].map(r=>r.map(q).join(',')).join('\r\n')+'\r\n';
+ const csv=[['sample_id','median_feature_percentile','status','weighting'],...estimateAsset().sampleIds.map((id,i)=>[id,c.row.values[i],c.row.queryRecords?.includes(i)?'unknown_participant_query':c.row.status[i],c.series.weighting])].map(r=>r.map(q).join(',')).join('\r\n')+'\r\n';
  // One archive avoids browser restrictions on multiple automatic downloads.
  const files=[{name:'profile.csv',text:csv},{name:'definition.json',text:JSON.stringify(definition,null,2)}];
  const zip=await heatmapZip(files);estimateDownload(zip,'MiCOVE-joint-cluster-'+cluster.id+'-equal-'+c.series.weighting+'.zip','application/zip');

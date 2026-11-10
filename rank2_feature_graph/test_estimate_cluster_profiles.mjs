@@ -101,3 +101,19 @@ run('jointProfileModel().weighting="groups"');
 assert.equal(run('jointProfileExportReady()'),false,'Do not export a previous color row with a newly selected definition');
 await assert.rejects(run('jointProfileExport()'),/finish loading/);
 console.log('PASS: saved-definition provenance, exact heatmap comparison, explicit cluster adoption, export identity and unchanged selections/embeddings.');
+
+// Supplementary queries never enter the percentile reference or change old scores.
+context.queryInput={...input,queryRecords:[3],queryPolicy:'Unknown participant: exclusion cannot be guaranteed.',queryValuesBase64:Buffer.from(new Float64Array([10,20,1]).buffer).toString('base64')};
+assert.deepEqual(plain(run('jointProfileScores(queryInput,[0],4).values')),[12.5,37.5,75,37.5]);
+assert.deepEqual(plain(run('jointProfileScores(queryInput,[2],4).values')),[25,25,75,50]);
+assert.equal(run('jointProfileScores(queryInput,[0,1,2],4,asset.correlations.fields,"groups").values[3]'),50);
+assert.equal(run('jointProfileScores(queryInput,[0],4).referenceParticipants'),2);
+assert.deepEqual(plain(run('jointProfileScores(queryInput,[0],4).queryRecords')),[3]);
+context.badQuery={...context.queryInput,queryRecords:[0]};
+assert.throws(()=>run('jointProfileScores(badQuery,[0],4)'),/query index/);
+console.log('PASS: supplementary query percentiles, exact ties, frozen participant weights, group-balanced profiles and query/reference separation.');
+
+context.extremeQuery={...context.queryInput,queryValuesBase64:Buffer.from(new Float64Array([1000,20,1]).buffer).toString("base64")};
+context.queryColor={row:context.jointProfileScores(context.extremeQuery,[0],4)};
+context.oldColor={row:context.jointProfileScores(input,[0],4)};
+assert.deepEqual(plain(context.estimateLimitsCached(context.queryColor)),plain(context.estimateLimitsCached(context.oldColor)),"Supplementary queries cannot change old colors or winsorization limits");

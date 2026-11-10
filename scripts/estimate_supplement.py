@@ -73,6 +73,11 @@ REVIEWED['e66b3982ee13ac39ee03107f5c6a48e45b4e76177ec27c7fee65d9cef3abbf7e'] = {
     **REVIEWED['2489a580532a4b0eb7d6a9ac4ba5db7d01e2cd74d21e5c36aee7581d88f3a8e1'],
 }
 
+# Query-only profiles and supplementary positions; all original coordinates fixed.
+REVIEWED['5b0c8f4c48740780f5701d3844381291d2e647cb2eeaa71e91cb1badb61abeb6'] = {
+    **REVIEWED['e66b3982ee13ac39ee03107f5c6a48e45b4e76177ec27c7fee65d9cef3abbf7e'],
+}
+
 
 def export_files(value):
     """Find shared transformation references as well as explicit file lists."""

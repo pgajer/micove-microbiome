@@ -5,11 +5,43 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import struct
 
 from estimate_catalogue import checked_file, load_catalogue, order_hash, read_json, validate_manifest
 
 
 class EstimateCatalogueTests(unittest.TestCase):
+    def supplementary_fixture(self, data):
+        old_records = data['recordIndices'][:]
+        query = next(i for i in range(data['sampleCount']) if i not in old_records)
+        def digest(rows):
+            return hashlib.sha256(b''.join(struct.pack('<'+'d'*len(row), *row) for row in rows)).hexdigest()
+        extension = dict(version=1, referenceRecords=old_records, recordIndices=[query],
+            policy='Unidentified query; participant exclusion cannot be guaranteed.', parentSha256='a'*64,
+            method='fixed-reference relative-distance least squares', originalEvaluation=copy.deepcopy(data['evaluation']),
+            originalCoordinatesSha256=digest(data['coordinates']), originalProfilesSha256=digest(data['profileScores']),
+            referencePairRelativeRms=.1, diagnostics=[dict(record=query, success=True, relativeRms=.1)])
+        data['recordIndices'].append(query)
+        data['coordinates'].append(data['coordinates'][0][:])
+        data['profileScores'].append(data['profileScores'][0][:])
+        extension['extendedProfilesSha256'] = digest(data['profileScores'])
+        data['supplementary'] = extension
+        data['excludedRecords'] -= 1
+        n = len(data['recordIndices'])
+        data['evaluation'].update(profiles=n, pairs=n*(n-1)//2, zeroPairs=0)
+
+    def test_supplementary_joint_map_keeps_frozen_scope(self):
+        self.profile_embedding_fixture(self.supplementary_fixture)
+        self.load()
+
+    def test_supplementary_map_rejects_moved_original_points(self):
+        def change(data):
+            self.supplementary_fixture(data)
+            data['coordinates'][0][0] += .01
+        self.smoothed_embedding_fixture(change)
+        with self.assertRaisesRegex(ValueError, 'changed original coordinates'):
+            self.load()
+
     def test_profile_outcome_geometry_requires_binding(self):
         self.manifest['geometries'][0]['profileRepresentationId'] = 'missing'
         with self.assertRaisesRegex(ValueError, 'outcome-excluded representation'):

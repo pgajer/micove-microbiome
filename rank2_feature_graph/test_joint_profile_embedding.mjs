@@ -283,3 +283,21 @@ ctx.jointEmbeddingRestore({id:'test',choice:'composition'});
 assert.equal(ctx.jointEmbeddingTransform(source,layout).traces,source,'Taxonomic reference path stays unchanged');
 assert.equal(JSON.stringify(referenceNodes),originalNodes);assert.equal(JSON.stringify(data),originalData);assert.equal(JSON.stringify(smooth),originalSmooth);
 console.log('PASS: supported alternatives, correct observed abundances, deterministic ties, full-map scope, unchanged taxonomic references/embeddings and hidden marker behavior.');
+
+// Restoring a formerly missing original reference uses its new position only.
+const extended={...structuredClone(data),id:'extended',recordIndices:[0,1,3,2],coordinates:[...data.coordinates,[41,42,43]],profileScores:[...data.profileScores,[15,25]],excludedRecords:0,supplementary:{recordIndices:[2],referenceRecords:[0,1,3]}};
+asset.profileEmbeddings.push({id:'extended',sha256:'extended',http:{}});
+ctx.VME_ASSETS.group=async()=>structuredClone(extended);
+ctx.jointEmbeddingRestore({id:'extended',choice:'profiles'});await ctx.jointEmbeddingEnsure();
+const extendedResult=ctx.jointEmbeddingTransform(source,layout);
+assert.deepEqual(plain(extendedResult.traces[0].x),[1,4,41,7]);
+assert.match(extendedResult.traces[0].text[2],/Supplementary query.*subject ID unavailable/);
+assert.equal(extendedResult.traces[0].text[0],'A');
+assert.equal(ctx.jointEmbeddingSupportedReference(referenceNodes[3]),referenceNodes[3]);
+const restored=extendedResult.traces.find(t=>t.meta?.jointReference), restoredIndex=restored.customdata.indexOf('endpoint-vertices:4');
+assert.equal(restored.x[restoredIndex],41);assert.match(restored.text[restoredIndex],/subject ID unavailable/);
+assert.doesNotMatch(restored.text[restoredIndex],/\[alternative\]/);
+assert.deepEqual(plain(ctx.jointEmbeddingModel().data.coordinates.slice(0,3)),data.coordinates);
+assert.match(ctx.el('sampleStatus').textContent,/cannot reliably be excluded/);
+assert.equal(JSON.stringify(source),frozen);
+console.log('PASS: supplementary samples, unchanged existing positions/colors, restored original references and participant-exclusion flags.');

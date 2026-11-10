@@ -86,7 +86,7 @@ function estimateIndex(index,record=null,profile=null){
 }
 function estimateCurrent(){const s=estimateSelection();return s&&estimateLoaded?.asset===estimateAsset()&&estimateLoaded.series.id===s.id?estimateLoaded:null}
 function estimatePointColor(index,record=null,profile=null){const c=estimateCurrent();return c?estimateColor(c.row.values[estimateIndex(index,record,profile)],estimateLimitsCached(c)):estimateNeutral}
-function estimateLimitsCached(c){const clip=estimateModel().clip;if(c.clip!==clip||c.limits===undefined){c.clip=clip;c.limits=estimateLimits(c.row.values,clip)}return c.limits}
+function estimateLimitsCached(c){const clip=estimateModel().clip;if(c.clip!==clip||c.limits===undefined){c.clip=clip;c.limits=estimateLimits(c.row.colorReferenceIndices?c.row.colorReferenceIndices.map(i=>c.row.values[i]):c.row.values,clip)}return c.limits}
 function estimateSyncOptions(){
  const select=el('sampleColorScheme'),asset=estimateAsset(),expected=new Set((asset?.categories||[]).map(c=>'estimate:'+c.id));
  const profiles=asset?.geometries?.some(g=>g.profileRepresentationId);

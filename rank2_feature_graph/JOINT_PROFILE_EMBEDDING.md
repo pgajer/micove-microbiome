@@ -260,3 +260,7 @@ node rank2_feature_graph/test_joint_profile_embedding.mjs
 python3 -m unittest discover -s rank2_feature_graph -p test_estimate_catalogue.py
 python3 -m unittest discover -s scripts -p test_estimate_supplement.py
 ```
+
+## Supplementary specimens without participant IDs
+
+The supplementary-profile release adds 26 query specimens to all three maps, keeping every original coordinate, profile, cluster and percentile reference unchanged. Query profiles use the same 40-person estimators and frozen transformations. Their own participant cannot reliably be excluded from smoothing. These are descriptive estimates, not participant-excluded predictions. See [supplementary profile methods](SUPPLEMENTARY_PROFILES.md) for fixed-map placement, evaluation and restored original reference specimens. Numerical comparisons above describe the original 1,965-specimen fits.

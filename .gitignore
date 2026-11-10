@@ -192,3 +192,7 @@
 !/rank2_feature_graph/fit_smoothed_phylotypes.R
 !/rank2_feature_graph/package_smoothed_phylotypes.py
 !/rank2_feature_graph/SMOOTHED_PHYLOTYPES.md
+!/rank2_feature_graph/extend_profile_maps.py
+!/rank2_feature_graph/smooth_profile_queries.R
+!/rank2_feature_graph/test_extend_profile_maps.py
+!/rank2_feature_graph/SUPPLEMENTARY_PROFILES.md
