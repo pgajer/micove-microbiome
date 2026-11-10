@@ -13,12 +13,16 @@ Choose **Representation → Joint profiles · Outcomes excluded · Equal feature
 sidebar. **Taxonomic composition** returns to the existing embeddings. State,
 cohort and participant selections restrict the fixed profile map. They do not
 refit it. Coloring, navigation and PNG export work in either representation.
-Reference vertices identify the original observed taxon-reference specimens at
-their saved positions in each profile map. These are specimen landmarks, not
-pure-taxon corners or feature-cluster representatives. Label percentages retain
-the original observed taxon abundances. References without saved coordinates
-are omitted and named in the Reference vertices section; no substitutes or
-projections are used. Their markers and labels use the shared visibility, sphere,
+Reference vertices identify observed specimens at their saved positions in each
+profile map. Prefer the original taxon reference. If it lacks coordinates, use
+the participant-linked specimen with the highest observed abundance of that taxon
+among all specimens in the saved map, breaking exact ties by frozen catalogue
+record order. Mark it **[alternative]** and display its own observed abundance.
+Selection does not change this reference population. These are specimen landmarks,
+not pure-taxon corners or feature-cluster representatives. If no supported
+positive-abundance specimen exists, omit the reference and explain why. No
+coordinates are fitted or projected, and taxonomic-composition references stay
+unchanged. Their markers and labels use the shared visibility, sphere,
 size, color and lighting controls and stay outside sample counts and error
 evaluations. Face unfolding applies only to composition space.
 

@@ -109,11 +109,16 @@ a convergence certificate.
 Choose a saved map under Representation. Existing embeddings, state memberships,
 colors and selections are preserved. Selections and participant trajectories
 restrict population coordinates; they do not trigger local refits. Reference
-taxon markers identify the original observed reference specimens at their saved
-smoothed positions. They are not pure-taxon corners; label percentages retain
-the original observed abundances, not the smoothed values. References lacking
-saved coordinates are omitted and named in the Reference vertices section; no
-substitutes or projections are used. Markers stay outside sample counts and
+taxon markers identify observed specimens at their saved smoothed positions.
+Prefer the original taxon reference. If it lacks coordinates, use the
+participant-linked specimen with the highest observed abundance of that taxon
+among all specimens in the saved map; exact ties follow frozen catalogue record
+order. Label it **[alternative]** with its own observed abundance, not the
+original reference maximum or the smoothed value. This full-map choice remains
+fixed across sample selections. These are specimen landmarks, not pure-taxon
+corners. If no supported positive-abundance specimen exists, omit the reference
+and explain why. No coordinates are fitted or projected, and references in
+taxonomic-composition views remain unchanged. Markers stay outside sample counts and
 distance-error evaluations. The shared visibility, sphere, size, color and
 lighting controls apply in these maps too. Existing outcome colors remain their original fields, with their
 original estimation spaces; they are not refitted on these maps. Representation

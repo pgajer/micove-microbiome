@@ -222,7 +222,7 @@ assert.equal(selectedReferences.layout.scene.annotations[0].font.size,16);
 assert.match(refTrace.text[0],/original observed taxon abundances.*not smoothed/);
 assert.deepEqual(plain(ctx.jointEmbeddingModel().displayed),[1],'Reference specimens never enter distance-error or sample-count populations');
 assert.deepEqual(plain(samples),[1]);assert.deepEqual(plain(selectedReferences.traces[0].marker),{color:['blue'],size:[3]});
-assert.deepEqual(plain(ctx.jointEmbeddingModel().references),{available:3,total:4,missing:['Unsupported taxon']});
+assert.deepEqual(plain(ctx.jointEmbeddingModel().references),{available:3,total:4,missing:['Unsupported taxon'],alternatives:[]});
 ctx.participant.showVertices=false;
 const hiddenReferences=ctx.jointEmbeddingTransform(selectedSource,layout);
 assert.equal(hiddenReferences.traces.find(t=>t.meta?.jointReference).visible,false);assert.equal(hiddenReferences.layout.scene.annotations.length,0);
@@ -250,3 +250,36 @@ ctx.jointEmbeddingAfterRender();assert.equal(referenceAvailable,true);assert.equ
 assert.match(referenceNote.textContent,/Unsupported taxon.*omitted/);
 assert.equal(JSON.stringify(source),frozen);assert.equal(refsOnly.x[0],99);
 console.log('PASS: observed reference identities, saved-map coordinates, missing-reference disclosure, selection/color/count preservation, participant mode and visibility.');
+
+// An alternative is chosen over the full saved map, never the selected samples.
+// Reversed record order tests deterministic ties; missing/unlinked rows cannot win.
+const originalNodes=JSON.stringify(referenceNodes),originalData=JSON.stringify(data),originalSmooth=JSON.stringify(smooth);
+const population={records:[{id:'specimen-d',profile:3,subject:'person-d'},{id:'specimen-b',profile:1,subject:'person-b'},{id:'specimen-a',profile:0,subject:'person-a'},{id:'specimen-c',profile:2,subject:''}],compositions:{0:[[0,.99],[3,.1]],1:[[3,.42]],2:[[3,.95]],3:[[3,.42]]}};
+ctx.participantData=()=>population;
+const fallbackInput=[{...selectedSource[0],ids:['0']},refsOnly];
+for(const [id,x] of [['test',4],['smooth',34]]){
+ ctx.jointEmbeddingRestore({id,choice:'profiles'});await ctx.jointEmbeddingEnsure();
+ const result=ctx.jointEmbeddingTransform(fallbackInput,layout),trace=result.traces.find(t=>t.meta?.jointReference),at=trace.customdata.indexOf('endpoint-vertices:4');
+ assert.equal(trace.x[at],x,'Alternative uses its own saved coordinate in each representation');
+ assert.match(trace.text[at],/Unsupported taxon \(42%\) \[alternative\]/);
+ assert.match(trace.text[at],/Alternative for specimen specimen-c/);
+ assert.match(trace.text[at],/Reference specimen: specimen-b/);
+ assert.match(result.layout.scene.annotations.find(a=>a.name==='endpoint-vertex:4').text,/42%.*alternative/);
+ assert.equal(ctx.jointEmbeddingSupportedReference(referenceNodes[0]),referenceNodes[0],'Available original always retained');
+ assert.deepEqual(plain(ctx.jointEmbeddingModel().displayed),[0]);
+ assert.deepEqual(plain(result.traces[0].marker),plain(fallbackInput[0].marker));
+ ctx.jointEmbeddingAfterRender();assert.match(referenceNote.textContent,/Alternative references: Unsupported taxon \(42%\)/);
+ assert.equal(ctx.jointEmbeddingModel().references.missing.length,0);
+ ctx.participant.showVertices=false;
+ const hidden=ctx.jointEmbeddingTransform(fallbackInput,layout);
+ assert.equal(hidden.layout.scene.annotations.length,0);assert.equal(hidden.traces.find(t=>t.meta?.jointReference).visible,false);
+ ctx.participant.showVertices=true;
+}
+population.records.find(r=>r.id==='specimen-b').subject='';
+assert.equal(ctx.jointEmbeddingSupportedReference(referenceNodes[3]).anchor_id,'specimen-d','Unknown participants cannot supply alternatives');
+population.compositions[3]=[];population.compositions[0]=[[3,0]];
+assert.equal(ctx.jointEmbeddingSupportedReference(referenceNodes[3]),null,'No zero-abundance or unsupported substitute');
+ctx.jointEmbeddingRestore({id:'test',choice:'composition'});
+assert.equal(ctx.jointEmbeddingTransform(source,layout).traces,source,'Taxonomic reference path stays unchanged');
+assert.equal(JSON.stringify(referenceNodes),originalNodes);assert.equal(JSON.stringify(data),originalData);assert.equal(JSON.stringify(smooth),originalSmooth);
+console.log('PASS: supported alternatives, correct observed abundances, deterministic ties, full-map scope, unchanged taxonomic references/embeddings and hidden marker behavior.');
