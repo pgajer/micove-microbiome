@@ -358,3 +358,11 @@ or exhaustive layout audit is part of these tests or the usual update command.
 The shared-viewer integration harness reports AGP and skin population viewers
 separately as not exercised: they use their own entry points and payload schemas.
 Use their dedicated checks for changes to those viewers.
+
+LSVF state-local correlations: the optional data-dependent pilot and expansion
+commands in [the catalogue contract](rank2_feature_graph/ESTIMATE_CATALOGUE.md#state-local-correlation-validation-on-demand)
+compare the JavaScript calculation with an independent NumPy reference. Run the
+pilot before changing sample scoping, participant weights, ranks or local feature
+exclusions; run expansion before claiming coverage of every retained state.
+They use existing estimates and saved state memberships and do not refit models.
+Keep both checks on demand, outside the update command.

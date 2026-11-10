@@ -198,3 +198,6 @@
 !/rank2_feature_graph/SUPPLEMENTARY_PROFILES.md
 !/rank2_feature_graph/extend_query_estimates.py
 !/rank2_feature_graph/test_extend_query_estimates.py
+
+!/rank2_feature_graph/check_local_correlations.py
+!/rank2_feature_graph/check_local_correlations.mjs

@@ -127,10 +127,15 @@ person correlation. Weighted Spearman uses weighted mid-distribution ranks and
 weighted Pearson correlation of those ranks; exact ties share a rank.
 
 Use unclipped saved estimates. Relative color scales do not change the heatmap.
-**Follow graph selection** is initially on: an edge restricts correlations to its
+**Use graph-selected samples** is initially on: an edge restricts correlations to its
 samples in the current cohort, and a vertex to its visible incident-state union.
 Unrelated background samples and reference markers are excluded. Clear the graph
 selection or uncheck this option to restore the full eligible reference.
+The checkbox and a sample-scope description stay above the settings section,
+including when settings are collapsed. Saved explicit full-reference choices
+remain available and are labeled as ignoring the graph selection. Merged states
+are labeled by target coverage (for example, 60%-2-CST); pure states are labeled
+separately. Cluster numbers refer to the current sample scope and settings.
 Only selected visits contribute in either counting mode; recompute participant
 means, equal-person weights, ranks and clusters within the selection. The original
 response estimates remain fixed, with no refitting within a state.
@@ -139,7 +144,8 @@ Optional `selectionInputs` banks contain one compact, finite float64 little-endi
 feature-major array per K, alongside checked feature order, eligible record
 indices and participant-group IDs. They preserve exact saved estimate values.
 A cancellable background worker computes subset correlations and complete linkage;
-only three recent subset results are cached. At least three eligible participants
+only three recent subset results are cached. Identical memberships reuse the
+same calculation, including across coverage levels. At least three eligible participants
 are required. Constant fields are excluded separately for every subset. The saved
 full-reference banks and all original estimate arrays remain unchanged.
 
@@ -197,7 +203,7 @@ outside **Heatmap settings**, along with the clustering method and its parameter
 The catalogue panel is the single vertical scroll area; the gallery has no
 nested height limit, so the last heatmap and its graph remain reachable in
 normal and maximized views. The participant-averaging checkbox, shared K and
-Follow graph selection remain available. Saved clustering preferences persist;
+Use graph-selected samples remain available. Saved clustering preferences persist;
 older settings without a clustering method or scope adopt the new defaults.
 
 Each heatmap has an expandable **Feature cluster graph** beneath it. Within-group
@@ -608,3 +614,35 @@ Selection-input banks can additionally carry query-only field arrays at each
 available K. Their reference arrays, participant groups and clustering inputs
 remain unchanged. Profile representations and their numerical evaluations are
 independent immutable assets; extending color fields does not refit them.
+
+
+### State-local correlation validation (on demand)
+
+`check_local_correlations.py` checks the real JavaScript calculation against an
+independent NumPy calculation without changing estimates, memberships or maps.
+It requires Python with NumPy and Node, the installed estimate catalogue, and
+the HTTP JSON dataset asset containing the LSVF cohort analysis.
+
+```sh
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
+python3 rank2_feature_graph/check_local_correlations.py \
+  --catalogue /path/to/estimate-catalogue --dataset-asset /path/to/dataset.json \
+  --phase pilot --output /path/to/new-pilot-results
+
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
+python3 rank2_feature_graph/check_local_correlations.py \
+  --catalogue /path/to/estimate-catalogue --dataset-asset /path/to/dataset.json \
+  --phase all --pilot /path/to/new-pilot-results --output /path/to/new-all-results
+```
+
+The pilot checks the three largest merged 60%-2-CSTs at K = 10, 20, 40 and 80,
+with Spearman and Pearson correlations and both visit-counting options. Expansion
+requires a passing pilot and checks every retained state at every coverage at
+K = 40, Spearman, in both counting modes. Both separate and joint Dynamic Tree Cut
+(minimum size 5, sensitivity 1) are checked for each supported calculation.
+Memberships must match saved state fits. Missing-ID specimens are excluded;
+constant fields are removed within the state; fewer than three identified
+participants gives an unavailable result. Results include source hashes, counts,
+maximum discrepancies, clustering counts and exact checked correlation arrays.
+These are numerical and membership checks, not evidence of inferential validity
+or cluster stability. Neither command runs during installation or updates.

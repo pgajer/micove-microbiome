@@ -47,11 +47,19 @@ context.current=()=>({nodes:[{id:1,label:'Anchor'}],edges:[{id:'1,2',label:'A + 
 context.visibleIncidentEdges=()=>[{id:'1,2'},{id:'1,3'}];
 context.el=id=>id==='coverage'?{value:'70'}:id==='cohortSelect'?{value:'cohort'}:element;
 assert.deepEqual(Array.from(run('estimateCorrelationScope().recordIndices')),[0]);
+assert.match(run('estimateCorrelationScope().label'),/^70%-2-CST: A \+ B/);
+context.activeStateMode='pure';assert.match(run('estimateCorrelationScope().label'),/^Pure 2-CST:/);context.activeStateMode='merged';
+assert.match(run('estimateCorrelationScopeDescription(estimateCorrelationScope(),estimateCorrelationState(),{records:0,participants:0})'),/1 specimens excluded: missing participant ID/);
+// Labels/coverage may change while membership and estimates remain identical.
+run('cachedScope=estimateCorrelationScope(); cachedInput={revision:"input-v1"}; estimateCorrelationSelectionCache.set(JSON.stringify([asset.datasetId,asset.revision,cachedInput.revision,cachedScope.recordIndices,40,"visits","spearman"]),bank)');
+assert.equal((await run('estimateCorrelationCompute(cachedInput,{...cachedScope,key:"another-coverage"},{k:40,unit:"visits",method:"spearman"})')).records,9);
+
 context.selected=null;context.selectedVertex=1;
 assert.deepEqual(Array.from(run('estimateCorrelationScope().recordIndices')),[0,1]);
 context.visibleIncidentEdges=()=>[{id:'1,3'}];
 assert.deepEqual(Array.from(run('estimateCorrelationScope().recordIndices')),[1]);
 run('estimateCorrelationState().follow=false');assert.equal(run('estimateCorrelationScope().kind'),'full');
+assert.match(run('estimateCorrelationScopeDescription(estimateCorrelationScope(),estimateCorrelationState())'),/current graph selection is not used/);
 run('estimateCorrelationState().follow=true');context.selectedVertex=null;
 assert.equal(run('estimateCorrelationScope().kind'),'full');
 console.log('PASS: selected edge/vertex membership, cohort restriction, hidden incident states and full-reference toggle.');
@@ -217,3 +225,8 @@ assert.deepEqual(Array.from(run('estimateCorrelationGraphVisible(connectedGraph,
 assert.equal(run('estimateCorrelationGraphVisible(connectedGraph,{graphThreshold:1,graphSign:"both"}).nodes.length'),0);
 assert.equal(run('connectedGraph.nodes.length'),3,'Visibility does not delete clusters');
 console.log('PASS: degree-zero nodes hidden after both magnitude and sign filters; source graph retained.');
+
+const uiSource=fs.readFileSync(new URL('estimate_correlations.js',import.meta.url),'utf8');
+assert.ok(uiSource.indexOf('id="correlationFollow"') < uiSource.indexOf('id="correlationSettings"'));
+assert.equal(uiSource.match(/id="correlationFollow"/g).length,1);
+console.log('PASS: always-visible sample scope, merged/pure labels, missing-participant disclosure and identical-membership cache reuse.');
