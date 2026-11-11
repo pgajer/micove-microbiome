@@ -58,9 +58,9 @@ def descriptors(value):
 
 def asset_path(web, desc):
     url = desc['url']
-    if not re.fullmatch(r'/vme-assets/[a-f0-9]{64}\.(json|js)', url):
+    if not re.fullmatch(r'/vme-assets/[a-f0-9]{64}\.(json|js|f64\.gz|tsv\.gz)', url):
         raise ValueError('Invalid asset path: ' + url)
-    if Path(url).stem != desc['sha256']:
+    if Path(url).name.split('.', 1)[0] != desc['sha256']:
         raise ValueError('Asset filename/hash mismatch')
     path = (web / url.lstrip('/')).resolve()
     if web.resolve() not in path.parents:
@@ -523,7 +523,7 @@ def app_destination(output=None):
 
 def update(package=None, metadata_path=None, output=None, neighborhood_package=None, neighborhood_metadata=None,
            catalog=None, datasets=None, select_datasets=False, agp_population=None, skin_exchanges=None, skin_states=None,
-           estimate_catalogues=None):
+           estimate_catalogues=None, comb_mg=None):
     output = app_destination(output)
     # Reject the source checkout before creating any locks or staging folders.
     if output == ROOT or output in ROOT.parents or ROOT in output.parents:
@@ -596,6 +596,18 @@ def update(package=None, metadata_path=None, output=None, neighborhood_package=N
                 receipt_path = candidate/'SOURCE_AND_DATA.json'
                 receipt = json.loads(receipt_path.read_text())
                 receipt['agpPopulation'] = str(population_path)
+                receipt_path.write_text(json.dumps(receipt, indent=2)+'\n')
+            comb_mg = comb_mg or old_receipt.get('combMg')
+            if comb_mg:
+                from comb_mg_supplement import attach as attach_comb_mg
+                path = Path(comb_mg).expanduser().resolve()
+                if output == path or output in path.parents or path in output.parents:
+                    raise ValueError('Keep comb-mg data outside the app folder')
+                digest = attach_comb_mg(candidate/'web/index.html', path)
+                extend_instance(candidate, 'comb-mg', digest)
+                receipt_path = candidate/'SOURCE_AND_DATA.json'
+                receipt = json.loads(receipt_path.read_text())
+                receipt['combMg'] = str(path)
                 receipt_path.write_text(json.dumps(receipt, indent=2)+'\n')
             skin_exchanges = skin_exchanges if skin_exchanges is not None else old_receipt.get('skinExchanges')
             if skin_exchanges:
@@ -681,12 +693,13 @@ def main():
     item.add_argument('--skin-exchange', nargs='+', type=Path, help='Registered skin v2 exchange directories (remembered locally)')
     item.add_argument('--skin-states', type=Path, help='Reviewed skin genus-state sidecar directory (remembered locally)')
     item.add_argument('--estimate-catalogue', nargs='+', type=Path, help='Reviewed exploratory estimate directories (remembered locally)')
+    item.add_argument('--comb-mg', type=Path, help='Reviewed combined metagenomic CAG package (remembered locally)')
     args = parser.parse_args()
     try:
         if args.command == 'update':
             update(args.package, args.metadata, args.output, args.neighborhood_package, args.neighborhood_metadata,
                    args.catalog, args.datasets, args.select_datasets, args.agp_population, args.skin_exchange, args.skin_states,
-                   args.estimate_catalogue)
+                   args.estimate_catalogue, args.comb_mg)
         elif args.command == 'prepare':
             prepare(args.package.resolve(), args.metadata.resolve(), args.output.resolve())
         else:

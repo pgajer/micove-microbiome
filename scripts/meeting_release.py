@@ -127,6 +127,9 @@ def assemble(root, chosen, output):
     if any(entry.get('capability') in ('skin-population-v1', 'skin-population-v2') for entry in manifest['datasets'].values()):
         from skin_supplement import viewer_bytes
         manifest['skinViewer'] = publish(viewer_bytes())
+    if any(entry.get('capability') == 'cag-population-v1' for entry in manifest['datasets'].values()):
+        from comb_mg_supplement import viewer_bytes as cag_viewer_bytes
+        manifest['combMgViewer'] = publish(cag_viewer_bytes())
     manifest['validator'] = publish((p.HERE / 'bundle_format.js').read_bytes())
     loader = publish((p.HERE / 'asset_loader.js').read_bytes())
     bootstrap = '<script id="vme-http-manifest" type="application/json">' + p.encoded(manifest).decode().replace('</', '<\\/') + '</script><script src="' + loader['url'] + '"></script>'
@@ -151,7 +154,7 @@ def assemble(root, chosen, output):
     (outweb / 'reports/index.html').write_text(p.resource_page('Analysis documents', '<p>Open an installed dataset and use its analysis Methods or PDF buttons for the accompanying documents. This copy does not include the separate development report dashboard or mutual-overlap research browser. Live R analysis services are not included.</p>', '../index.html'))
     (output / 'vme-server').write_bytes(server)
     (output / 'vme-server').chmod(0o755)
-    identity = p.sha(p.encoded(dict(application=manifest['application'], release=p.sha((root / 'catalog.json').read_bytes()), datasets=chosen, skinViewer=manifest.get('skinViewer'))))
+    identity = p.sha(p.encoded(dict(application=manifest['application'], release=p.sha((root / 'catalog.json').read_bytes()), datasets=chosen, skinViewer=manifest.get('skinViewer'), combMgViewer=manifest.get('combMgViewer'))))
     (outweb / 'vme-instance.txt').write_text(identity)
     launcher = LAUNCHER.replace('INSTANCE_ID', identity)
     p.write_launchers(output, launcher)

@@ -133,6 +133,13 @@ async function start(id){
   const dataset=manifest.datasets[id]?id:manifest.neighborhoods.datasets[0];
   library??=script(manifest.plotly).catch(error=>{library=null;throw error});
   const capability=manifest.datasets[id]?.capability;
+  if(capability==='cag-population-v1'){
+   const [part]=await Promise.all([loader.dataset(id),library,script(manifest.combMgViewer)]);
+   if(attempt!==revision)return;
+   const data=part.combMgPopulation;
+   if(data?.id!==id||data.revision!==manifest.datasets[id].dataset.revision)throw Error('CAG population identity mismatch.');
+   await root.showCombMgPopulation(data,choices);loader.status('');return;
+  }
   if(['skin-population-v1','skin-population-v2','agp-population-v1'].includes(capability)){
    const skin=capability.startsWith('skin-population-');
    const [part]=await Promise.all([loader.dataset(id),library,script(skin?manifest.skinViewer:manifest.agpViewer)]);

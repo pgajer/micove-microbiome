@@ -201,3 +201,8 @@
 
 !/rank2_feature_graph/check_local_correlations.py
 !/rank2_feature_graph/check_local_correlations.mjs
+!/scripts/comb_mg_supplement.py
+!/scripts/test_comb_mg_supplement.py
+!/rank2_feature_graph/comb_mg_population.js
+!/rank2_feature_graph/test_comb_mg_population.cjs
+!/rank2_feature_graph/COMB_MG.md

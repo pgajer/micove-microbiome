@@ -35,6 +35,18 @@ The active legend determines the meaning of color in a particular view.
 
 ## Sample coloring
 
+The optional **comb-mg** CAG-composition maps reuse the shared cohort colors.
+Identity-group colors are blue for the 3,544 reference profiles, orange for
+the 70 inferred LSVF links and gray for the 400 unresolved identities; these
+labels do not adjudicate identity or biological eligibility. Mapping status and
+CT persistence can be displayed using their original recorded codes; missing
+values remain Unavailable. Feature coloring uses the exact selected normalized
+CAG/residual value on Viridis, with its units labeled as a CAG fraction for L1
+or a max-scaled value for max normalization. Colors do not change saved maps,
+feature identities, sample filters or metadata. These compositions are not
+taxon/cell proportions, and no taxonomic CST palette is inferred.
+See [the CAG dataset contract](rank2_feature_graph/COMB_MG.md).
+
 LSVF query supplements extend saved outcome and feature fields to 26 specimens
 without subject IDs. These are queries only: their own participants cannot
 reliably be excluded. The sidebar, hover and CSV retain this limitation.

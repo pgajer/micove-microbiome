@@ -21,7 +21,7 @@ if(!flags.includes('--hover-only')){
 }
 // AGP/skin use separate population-viewer entry points, not switchDataset().
 // Report this boundary explicitly instead of feeding their payloads to the CST validator.
-const standaloneViewers=Object.entries(manifest.datasets).filter(([,entry])=>['agp-population-v1','skin-population-v1','skin-population-v2'].includes(entry.capability)).map(([id])=>id);
+const standaloneViewers=Object.entries(manifest.datasets).filter(([,entry])=>['agp-population-v1','skin-population-v1','skin-population-v2','cag-population-v1'].includes(entry.capability)).map(([id])=>id);
 const integratedDatasets=Object.keys(manifest.datasets).filter(id=>!standaloneViewers.includes(id));
 assert(integratedDatasets.includes(manifest.seed.default),'Integration entry must default to the shared CST viewer');
 const read=d=>fs.readFileSync(path.join(base,d.url));
