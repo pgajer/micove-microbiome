@@ -1,5 +1,11 @@
 # Exploratory skin populations
 
+**Distribution withdrawn, 11 November 2026.** The skin data packages are no
+longer distributed. The processing, adapter and viewer code remains available.
+The descriptions and installation
+examples below document the former release; they do not indicate that skin data
+are currently supplied with MiCOVE. Other datasets are unaffected.
+
 The separately distributed skin v2 packages provide three population maps:
 L1-normalized Euclidean, max-normalized Euclidean and max-normalized L∞.
 Each map uses its own original-space target distances. A participant or visit

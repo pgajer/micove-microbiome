@@ -592,6 +592,9 @@ relative abundance across this population first.
 
 ### Exploratory skin population maps
 
+The skin release was withdrawn on 11 November 2026. This section preserves the
+color contract for the retained viewer code, not a currently distributed dataset.
+
 Skin v2 populations appear under one Skin entry, with independent populations
 selected using Cohort. There is no pooled map or cross-cohort assignment.
 An optional, revision-bound genus-state supplement adds pure and current-coverage
