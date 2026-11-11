@@ -55,16 +55,25 @@ These annotations stay fixed across the CAG-only/inclusive and three geometry
 choices. They describe raw reads, not calibrated cell abundances or CAG states.
 The preserved gene-viewer annotations agree for all 3,544 reference samples.
 
-**Number of leading taxa** ranks pure 1-CSTs by their sample counts in the full
-chosen population. Count ties and leading-taxon abundance ties use frozen feature
-order; neither current population has an abundance tie. The default eight states
-cover 75.68% of 3.5k and 74.39% of 4k. Remaining samples stay gray as Other leading
-taxa. Changing N never filters samples or reassigns their state. A coverage-based
-selector would choose the smallest N reaching its target; this is sample coverage,
-not the taxon's relative abundance within individual samples. No merged labels
-are generated. The legend's n, % and c% describe displayed samples; marker
+**Pure 1-CST sample coverage** ranks states by sample count in the full chosen
+population and selects the smallest prefix reaching the target. Choices are
+10–90% in 10-percentage-point steps, plus 95%, 99% and 100%; the initial target is
+80%. Actual coverage can exceed the target because states are not split. At 80%,
+3.5k uses 11 states covering 80.98%, and 4k uses 12 states covering 81.24%.
+Count ties and leading-taxon abundance ties use frozen feature order; neither
+current population has an abundance tie. Remaining samples stay gray as Other
+leading taxa. Changing coverage never filters samples or reassigns their state.
+This is sample coverage, not the taxon's relative abundance within individual
+samples. No merged labels are generated. The legend's n, % and c% describe displayed samples; marker
 overlays do not enter those counts. Full-population rankings and reference
 samples remain fixed when cohort or identity filters change.
+
+Earlier saved preferences and named views specifying a number of taxa retain
+their colored states: that count is converted to its exact achieved coverage,
+shown as an additional saved-view option. Subsequent choices use the new target
+and persist normally. For example, eight states in 3.5k become a 75.68% saved-view
+option. Sample and state CSVs record the target and whether each state/sample is
+in the individually colored set; the remainder remains present in exports.
 
 **Sample appearance → Reference vertices** marks each displayed taxon's observed
 maximum-abundance sample at its saved 3D coordinates. Its label includes the actual

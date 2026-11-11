@@ -5,14 +5,30 @@ const m=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json')));
 const read=d=>JSON.parse(fs.readFileSync(path.join(folder,d.url)));
 const data=read(m.entry.parts[0]).combMgPopulation;let checks=0;
 const original=JSON.stringify(data);
+const toy={sampleCount:100,taxa:[{taxon:'a',n:50},{taxon:'b',n:30},{taxon:'c',n:10},{taxon:'d',n:10}]};
+assert.deepEqual(C.taxonDisplay(toy,50).taxa.map(t=>t.taxon),['a']);
+assert.deepEqual(C.taxonDisplay(toy,51).taxa.map(t=>t.taxon),['a','b']);
+assert.deepEqual(C.taxonDisplay(toy,90).taxa.map(t=>t.taxon),['a','b','c']);
+assert.equal(C.taxonDisplay(toy,100).n,100);
+assert.equal(C.taxonCoverageSetting(toy,{}),'80');
+assert.equal(C.taxonCoverageSetting(toy,{topTaxa:'2'}),'80');
+assert.equal(C.taxonCoverageSetting(toy,{topTaxa:'2',taxonCoverage:'90'}),'90');
 for(const [pop,d] of Object.entries(data.taxonContext||{})){
- const context=read(d),records=read(data.samples[pop]),shown=C.taxonDisplay(context,8);
+ const context=read(d),records=read(data.samples[pop]),migrated=C.taxonCoverageSetting(context,{topTaxa:'8'}),shown=C.taxonDisplay(context,migrated);
  assert.deepEqual(context.samples.map(s=>s.sample_id),records.map(s=>s.sample_id));
  assert.equal(shown.taxa.length,8);assert.equal(shown.n,pop==='3.5k'?2682:2986);
- assert.equal(C.taxonDisplay(context,10000).n,records.length);
+ assert.equal(C.taxonDisplay(context,100).n,records.length);
  assert(context.taxa.every((t,i)=>i===0||context.taxa[i-1].n>=t.n));
  for(const t of shown.taxa)assert.equal(t.referenceSample,records[t.referenceIndex].sample_id);
- const before=JSON.stringify(context);C.taxonDisplay(context,1);assert.equal(JSON.stringify(context),before);
+ const before=JSON.stringify(context);
+ for(let q=1;q<=100;q++){
+  const result=C.taxonDisplay(context,q);
+  assert(result.actualCoverage+1e-10>=q);
+  assert((result.n-result.taxa.at(-1).n)*100/context.sampleCount<q,'No shorter prefix reaches target');
+  assert.deepEqual(result.taxa,context.taxa.slice(0,result.taxa.length));
+ }
+ for(let n=1;n<=context.taxa.length;n++)assert.equal(C.taxonDisplay(context,C.taxonCoverageSetting(context,{topTaxa:String(n)})).taxa.length,n,'Legacy count preserved');
+ assert.equal(JSON.stringify(context),before);
 }
 for(const v of ['',null,'NA',' NaN ','N/A'])assert.equal(C.ctValue(v),'');
 assert.equal(C.ctValue('0'),'0');assert.equal(C.ctValue('1'),'1');

@@ -50,8 +50,11 @@ Colors do not change saved maps,
 feature identities, sample filters or metadata. These CAG compositions are not
 taxon/cell proportions. Optional Leading taxon (raw reads) coloring separately
 aggregates inclusive raw counts by their original taxon annotation. Pure 1-CSTs
-are ranked by full-population sample count; the top-N states use shared exact-name
-VMRC colors or deterministic full-name fallbacks, and Other leading taxa is gray.
+are ranked by full-population sample count. The smallest prefix reaching the
+chosen sample-coverage target uses shared exact-name VMRC colors or deterministic
+full-name fallbacks; Other leading taxa is gray. Actual coverage and state count
+are displayed. Count ties keep their frozen order. The initial target is 80%;
+older count-based settings retain their colored states via exact achieved coverage.
 Taxonomic suffixes remain distinct. Changing the CAG representation never changes
 these raw-read labels. Reference spheres use the observed maximum-abundance
 sample per displayed taxon, with its actual raw-read percentage and the ordinary
