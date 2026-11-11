@@ -1,5 +1,12 @@
 # Combined metagenomic CAG compositions
 
+**Release withdrawn, 11 November 2026.** The 54 mean-based CAG maps and their
+data package have been removed from the current distribution at the investigator's
+request. A replacement based on summed abundances is pending. Older summed maps
+used overlapping memberships and are not substituted for this disjoint catalogue.
+The adapter, viewer and generating code are retained. The contract and commands
+below document the withdrawn release; they are not current installation guidance.
+
 `comb-mg` is an optional, separately distributed exploratory dataset. It uses
 54 saved maps of samples described by disjoint co-abundant gene groups (CAGs).
 It adds no taxon CSTs, VALENCIA calls or participant trajectories. Existing

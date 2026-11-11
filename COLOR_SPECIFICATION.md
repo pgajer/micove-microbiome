@@ -35,7 +35,9 @@ The active legend determines the meaning of color in a particular view.
 
 ## Sample coloring
 
-The optional **comb-mg** CAG-composition maps reuse the shared cohort colors.
+The **comb-mg** mean-based CAG release was withdrawn on 11 November 2026;
+the following records its retained color contract, not a currently distributed
+dataset. Those CAG-composition maps reuse the shared cohort colors.
 Identity-group colors are blue for the 3,544 reference profiles, orange for
 the 70 inferred LSVF links and gray for the 400 unresolved identities; these
 labels do not adjudicate identity or biological eligibility. Mapping status and
