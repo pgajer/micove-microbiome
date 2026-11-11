@@ -46,6 +46,43 @@ are not enabled. Read compositions are not cell or strain proportions; CAGs do
 not receive invented taxonomic CST or VALENCIA assignments. The 31 flagged
 L. iners-assigned genes retain their unresolved annotation caution.
 
+### Leading taxa and observed references
+
+**Color by → Leading taxon (raw reads) · pure 1-CSTs** uses the most abundant
+taxon in each sample. Reads are summed across that taxon's disjoint CAGs and
+residual genes, then divided by all in-scope taxonomically assigned gene reads.
+These annotations stay fixed across the CAG-only/inclusive and three geometry
+choices. They describe raw reads, not calibrated cell abundances or CAG states.
+The preserved gene-viewer annotations agree for all 3,544 reference samples.
+
+**Number of leading taxa** ranks pure 1-CSTs by their sample counts in the full
+chosen population. Count ties and leading-taxon abundance ties use frozen feature
+order; neither current population has an abundance tie. The default eight states
+cover 75.68% of 3.5k and 74.39% of 4k. Remaining samples stay gray as Other leading
+taxa. Changing N never filters samples or reassigns their state. A coverage-based
+selector would choose the smallest N reaching its target; this is sample coverage,
+not the taxon's relative abundance within individual samples. No merged labels
+are generated. The legend's n, % and c% describe displayed samples; marker
+overlays do not enter those counts. Full-population rankings and reference
+samples remain fixed when cohort or identity filters change.
+
+**Sample appearance → Reference vertices** marks each displayed taxon's observed
+maximum-abundance sample at its saved 3D coordinates. Its label includes the actual
+raw-read fraction; it is not a hypothetical pure-taxon corner or state centroid.
+The maximum is searched over the full selected population, including specimens
+where another taxon dominates. Equal maxima use frozen sample order. References
+outside current sample filters remain as labeled context without adding samples.
+Show reference vertices, Sphere vertices, Vertex size/color, Ambient light,
+Highlights and label-size controls match the ordinary sample viewer and persist
+with saved settings and named views. Navigation, exports and coordinates remain
+unchanged. Sample CSV exports include leading taxon and read fraction; a separate
+CSV gives all pure 1-CST counts, cumulative percentages and reference specimens.
+
+The optional annotation adds content-addressed assets to a new package while
+preserving every existing map, abundance table and metadata record. An installed
+unannotated package can be upgraded only when those scientific fields are exactly
+identical. Older packages remain usable, with the extra coloring option absent.
+
 ### Installation and verification
 
 Obtain the separately distributed package from Pawel Gajer. Keep it outside the

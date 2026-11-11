@@ -47,8 +47,16 @@ tables and fractions of all in-scope reads for inclusive tables; max normalizati
 uses max-scaled values. The sidebar states the denominator and retained read
 fraction. Historical mean support retains its distinct CAG-fraction label.
 Colors do not change saved maps,
-feature identities, sample filters or metadata. These compositions are not
-taxon/cell proportions, and no taxonomic CST palette is inferred.
+feature identities, sample filters or metadata. These CAG compositions are not
+taxon/cell proportions. Optional Leading taxon (raw reads) coloring separately
+aggregates inclusive raw counts by their original taxon annotation. Pure 1-CSTs
+are ranked by full-population sample count; the top-N states use shared exact-name
+VMRC colors or deterministic full-name fallbacks, and Other leading taxa is gray.
+Taxonomic suffixes remain distinct. Changing the CAG representation never changes
+these raw-read labels. Reference spheres use the observed maximum-abundance
+sample per displayed taxon, with its actual raw-read percentage and the ordinary
+sample-reference appearance controls. Neither markers nor coloring alter sample
+membership, counts or saved coordinates; no merged states are inferred.
 See [the CAG dataset contract](rank2_feature_graph/COMB_MG.md).
 
 LSVF query supplements extend saved outcome and feature fields to 26 specimens

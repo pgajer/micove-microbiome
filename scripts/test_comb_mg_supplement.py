@@ -14,6 +14,20 @@ import comb_mg_supplement as c
 
 
 class GuardTests(unittest.TestCase):
+    def test_leading_taxa_recombine_residuals_and_use_observed_maxima(self):
+        import numpy as np
+        counts=np.array([[6,4,9,0],[2,2,5,4],[5,0,5,0]])
+        features=[{'taxon':x} for x in ['A','A','B','C']]
+        records=[{'sample_id':x} for x in ['a','b','tied']]
+        context=c.taxon_context(counts,features,records)
+        self.assertEqual([s['taxon'] for s in context['samples']],['A','B','A'])
+        self.assertTrue(context['samples'][2]['tied'])
+        self.assertEqual([t['n'] for t in context['taxa']],[2,1])
+        b=context['taxa'][1]
+        self.assertEqual(b['referenceSample'],'tied')  # B need not dominate its maximum-abundance sample.
+        self.assertEqual(b['referenceFraction'],0.5)
+        np.testing.assert_array_equal(counts,[[6,4,9,0],[2,2,5,4],[5,0,5,0]])
+
     def test_distinct_reviewed_releases(self):
         self.assertEqual(c.release(c.SUM_PIN)['representations'], ['sum_cag', 'sum_other'])
         self.assertEqual(c.release(c.SUM_PIN)['constructions'], ['AZ'])
@@ -53,6 +67,20 @@ class GuardTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError,'Conflicting'):c.attach(page,source)
                 self.assertEqual(before,page.read_bytes())
 
+    def test_annotation_upgrade_cannot_replace_maps_or_remove_annotations(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);(root/'vme-assets').mkdir()
+            def entry(data):
+                raw=p.encoded({'combMgPopulation':data});h=p.sha(raw)
+                d=dict(url='/vme-assets/'+h+'.json',sha256=h,bytes=len(raw));p.asset_path(root,d).write_bytes(raw)
+                return dict(dataset={'id':c.ID},parts=[d],resources=[])
+            base={'maps':{'one':{'coordinates':'exact'}},'samples':{'population':'unchanged'}}
+            old=entry(base);new=entry(dict(base,taxonContext={'population':'annotation'}))
+            self.assertTrue(c.annotation_upgrade(old,new,root,root))
+            self.assertFalse(c.annotation_upgrade(new,old,root,root))
+            changed=entry(dict(base,maps={'one':{'coordinates':'changed'}},taxonContext={'population':'annotation'}))
+            self.assertFalse(c.annotation_upgrade(old,changed,root,root))
+
 
 @unittest.skipUnless(os.environ.get('MICOVE_COMB_MG_PACKAGE'),'Set MICOVE_COMB_MG_PACKAGE for full saved-data checks')
 class SavedDataTests(unittest.TestCase):
@@ -78,6 +106,14 @@ class SavedDataTests(unittest.TestCase):
         self.assertTrue(all(not r['visit_id'] for r in records['4k']))
         self.assertTrue(all(r['study']=='unresolved' and not r['participant_id'] for r in records['4k'][3544:]))
         self.assertFalse(any(data['capabilities'][k] for k in ['taxonCST','valencia','trajectories','localFits']))
+        for pop,d in data.get('taxonContext',{}).items():
+            context=json.loads(p.checked_bytes(root,d));ids=[r['sample_id'] for r in records[pop]]
+            self.assertEqual([r['sample_id'] for r in context['samples']],ids)
+            self.assertEqual(sum(t['n'] for t in context['taxa']),len(ids))
+            for t in context['taxa']:
+                self.assertEqual(t['n'],sum(r['taxon']==t['taxon'] for r in context['samples']))
+                self.assertEqual(ids[t['referenceIndex']],t['referenceSample'])
+                self.assertGreater(t['referenceFraction'],0);self.assertLessEqual(t['referenceFraction'],1)
         # Check the full exported TSV axes independently, preserving parent-index gaps.
         for key,t in data['tables'].items():
             features=json.loads(p.checked_bytes(root,t['features']));pop=key.split('|')[0]

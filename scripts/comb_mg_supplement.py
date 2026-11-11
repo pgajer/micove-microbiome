@@ -62,6 +62,34 @@ def map_key(row):
     return '|'.join(row[k] for k in ('dataset', 'construction', 'representation', 'normalization', 'target_metric'))
 
 
+def taxon_context(counts, features, records):
+    """Pure leading-taxon annotation from inclusive disjoint raw-count sums."""
+    import numpy as np
+    taxa = list(dict.fromkeys(f['taxon'] for f in features))
+    require(all(taxa), 'Missing taxonomic annotation')
+    totals = np.column_stack([counts[:, [j for j, f in enumerate(features) if f['taxon'] == taxon]].sum(axis=1)
+                              for taxon in taxa])
+    den = counts.sum(axis=1)
+    require((den > 0).all() and np.allclose(totals.sum(axis=1), den, rtol=0, atol=0), 'Taxon read accounting mismatch')
+    fractions = totals / den[:, None]
+    winners = fractions.argmax(axis=1)
+    sizes = np.bincount(winners, minlength=len(taxa))
+    ranked = sorted((j for j, n in enumerate(sizes) if n), key=lambda j: (-int(sizes[j]), j))
+    references = []
+    for j in ranked:
+        i = int(fractions[:, j].argmax())
+        references.append(dict(taxon=taxa[j], n=int(sizes[j]), referenceIndex=i,
+            referenceSample=records[i]['sample_id'], referenceFraction=float(fractions[i, j]),
+            referenceTies=int(np.sum(fractions[:, j] == fractions[i, j]))))
+    samples = [dict(sample_id=r['sample_id'], taxon=taxa[j], fraction=float(fractions[i,j]),
+                    tied=bool(np.sum(fractions[i] == fractions[i,j]) > 1)) for i, (r,j) in enumerate(zip(records,winners))]
+    return dict(version=1, samples=samples, taxa=references, sampleCount=len(records),
+        denominator='All in-scope taxonomically assigned raw gene reads, including species_other',
+        ranking='Number of samples dominated by the taxon; ties use frozen feature order',
+        ties='Leading-taxon ties use frozen feature order; reference ties use frozen sample order',
+        referenceScope='Full selected population, including samples outside cohort/identity filters')
+
+
 def prepare(source, output):
     """Serial bounded conversion of saved maps/tables to lazy HTTP assets."""
     import numpy as np
@@ -158,6 +186,11 @@ def prepare(source, output):
                     if residuals: require(np.allclose(fractions, 1), 'Inclusive table does not retain all in-scope reads')
                     extra = dict(medianReadFraction=float(np.median(fractions)), minimumReadFraction=float(fractions.min()),
                                  residualCount=residuals, accounting=js(accounting), rawDownload=publish(Path(r['unclosed_tsv']).read_bytes(), '.tsv.gz'))
+                    if residuals and r['dataset'] not in data.get('taxonContext', {}):
+                        context = taxon_context(counts, features, records)
+                        context['source'] = dict(rawCountsSha256=sha_file(folder/'raw_counts.npy'),
+                                                featuresSha256=sha_file(r['features_tsv']), samplesSha256=sha_file(r['samples_tsv']))
+                        data.setdefault('taxonContext', {})[r['dataset']] = js(context)
                     del counts
                 # Stable feature order resolves display-only ties. No abundance changes.
                 top = np.argsort(-a, axis=1, kind='stable')[:, :5]
@@ -214,13 +247,26 @@ def package(directory):
 def viewer_bytes():
     # Reuse the authoritative shared cohort palette without initializing taxon/CST code.
     shared = (p.HERE/'valencia2.js').read_text().split('const sampleMajorCohortColors=', 1)[1].split('function sampleColorCategory', 1)[0]
-    return b'(() => {\nconst sampleMajorCohortColors=' + shared.encode() + b'\n' + (p.HERE/'png_export.js').read_bytes() + b'\n' + (p.HERE/'agp_graph_picking.js').read_bytes() + b'\n' + (p.HERE/'comb_mg_population.js').read_bytes() + b'\n})();'
+    taxon_colors = (p.HERE/'subject_trajectory.js').read_text().split('function trajectoryTaxonKey(', 1)[1].split('function trajectoryTaxonHex', 1)[0]
+    palette = p.encoded(p.load_palette(p.HERE))
+    return b'(() => {\nconst VMRC_TAXON_PALETTE=' + palette + b';\nfunction trajectoryTaxonKey(' + taxon_colors.encode() + b'\nconst sampleMajorCohortColors=' + shared.encode() + b'\n' + (p.HERE/'sphere_geometry.js').read_bytes() + b'\n' + (p.HERE/'png_export.js').read_bytes() + b'\n' + (p.HERE/'agp_graph_picking.js').read_bytes() + b'\n' + (p.HERE/'comb_mg_population.js').read_bytes() + b'\n})();'
+
+
+def annotation_upgrade(old, new, old_root, new_root):
+    """Allow additive annotations only when every existing scientific field is identical."""
+    if old == new: return True
+    if {k:v for k,v in old.items() if k not in ('parts','resources')} != {k:v for k,v in new.items() if k not in ('parts','resources')}: return False
+    if len(old['parts']) != 1 or len(new['parts']) != 1: return False
+    a = json.loads(p.checked_bytes(old_root, old['parts'][0]))['combMgPopulation']
+    b = json.loads(p.checked_bytes(new_root, new['parts'][0]))['combMgPopulation']
+    if 'taxonContext' in a or not b.get('taxonContext'): return False
+    return a == {k:v for k,v in b.items() if k != 'taxonContext'} and all(d in new['resources'] for d in old['resources'])
 
 
 def attach(page, directory):
     page, directory = Path(page), Path(directory)
     entry = package(directory); manifest = p.read_manifest(page)
-    require(manifest['datasets'].get(ID, entry) == entry, 'Conflicting installed comb-mg revision')
+    require(annotation_upgrade(manifest['datasets'].get(ID, entry), entry, page.parent, directory), 'Conflicting installed comb-mg revision')
     for d in p.descriptors(entry):
         dest = p.asset_path(page.parent, d); dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():
