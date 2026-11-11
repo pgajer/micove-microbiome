@@ -14,6 +14,12 @@ import comb_mg_supplement as c
 
 
 class GuardTests(unittest.TestCase):
+    def test_distinct_reviewed_releases(self):
+        self.assertEqual(c.release(c.SUM_PIN)['representations'], ['sum_cag', 'sum_other'])
+        self.assertEqual(c.release(c.SUM_PIN)['constructions'], ['AZ'])
+        self.assertEqual(c.release(c.SOURCE_PIN)['maps'], 54)
+        with self.assertRaisesRegex(ValueError, 'Unreviewed'):c.release('0'*64)
+
     def test_duplicate_and_empty_ids_rejected(self):
         for rows in [[{'sample_id':'a'},{'sample_id':'a'}],[{'sample_id':''}]]:
             with self.assertRaises(ValueError): c.unique(rows,'sample_id')
@@ -53,7 +59,10 @@ class SavedDataTests(unittest.TestCase):
     def test_all_saved_axes_metrics_and_metadata(self):
         root=Path(os.environ['MICOVE_COMB_MG_PACKAGE']);entry=c.package(root)
         data=json.loads(p.checked_bytes(root,entry['parts'][0]))['combMgPopulation']
-        self.assertEqual(len(data['maps']),54);self.assertEqual(len(data['tables']),36)
+        spec=c.release(data['sourceContractSha256'])
+        self.assertEqual(len(data['maps']),spec['maps']);self.assertEqual(len(data['tables']),spec['tables'])
+        self.assertEqual({k.split('|')[1] for k in data['maps']},set(spec['constructions']))
+        self.assertEqual({k.split('|')[2] for k in data['maps']},set(spec['representations']))
         records={key:json.loads(p.checked_bytes(root,desc)) for key,desc in data['samples'].items()}
         self.assertEqual(records['3.5k'],records['4k'][:3544])
         self.assertEqual(len(records['4k']),4014)
@@ -76,6 +85,16 @@ class SavedDataTests(unittest.TestCase):
                 header=next(f).rstrip('\n').split('\t');ids=[line.split('\t',1)[0] for line in f]
             self.assertEqual(header,['sample_id']+[x['feature'] for x in features])
             self.assertEqual(ids,[x['sample_id'] for x in records[pop]])
+            if data.get('abundanceKind') == 'sum':
+                accounting=json.loads(p.checked_bytes(root,t['accounting']))
+                self.assertEqual([x['sample_id'] for x in accounting],ids)
+                self.assertEqual(t['residualCount'],647 if key.split('|')[2]=='sum_other' else 0)
+                self.assertEqual(sum(f['kind']=='species_other' for f in features),t['residualCount'])
+                if t['residualCount']:self.assertEqual(t['medianReadFraction'],1)
+                else:self.assertGreater(t['medianReadFraction'],0.60);self.assertLess(t['medianReadFraction'],0.63)
+                with gzip.open(p.asset_path(root,t['rawDownload']),'rt') as f:
+                    self.assertEqual(next(f).rstrip('\n').split('\t'),header)
+                    self.assertEqual([line.split('\t',1)[0] for line in f],ids)
 
 
 if __name__=='__main__':unittest.main()

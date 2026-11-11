@@ -35,16 +35,18 @@ The active legend determines the meaning of color in a particular view.
 
 ## Sample coloring
 
-The **comb-mg** mean-based CAG release was withdrawn on 11 November 2026;
-the following records its retained color contract, not a currently distributed
-dataset. Those CAG-composition maps reuse the shared cohort colors.
+The **comb-mg** disjoint AZ summed-CAG release replaces the withdrawn mean-based
+release. Its 12 CAG-composition maps reuse the shared cohort colors.
 Identity-group colors are blue for the 3,544 reference profiles, orange for
 the 70 inferred LSVF links and gray for the 400 unresolved identities; these
 labels do not adjudicate identity or biological eligibility. Mapping status and
 CT persistence can be displayed using their original recorded codes; missing
 values remain Unavailable. Feature coloring uses the exact selected normalized
-CAG/residual value on Viridis, with its units labeled as a CAG fraction for L1
-or a max-scaled value for max normalization. Colors do not change saved maps,
+CAG/residual value on Viridis. L1 units are fractions of CAG reads for CAG-only
+tables and fractions of all in-scope reads for inclusive tables; max normalization
+uses max-scaled values. The sidebar states the denominator and retained read
+fraction. Historical mean support retains its distinct CAG-fraction label.
+Colors do not change saved maps,
 feature identities, sample filters or metadata. These compositions are not
 taxon/cell proportions, and no taxonomic CST palette is inferred.
 See [the CAG dataset contract](rank2_feature_graph/COMB_MG.md).

@@ -1,4 +1,4 @@
-"""Package and attach reviewed mean-based CAG maps; never fit or change inputs."""
+"""Package reviewed CAG maps, preserving summed and historical mean contracts."""
 import argparse
 import csv
 import gzip
@@ -18,6 +18,16 @@ ID = 'comb-mg'
 REVISION = 'disjoint-cag-means-20261111'
 SOURCE_PIN = '4fe7a9791a1d1e1f0bb59cad98488043422f1db8656691f73e8398b9de7533af'
 CAPABILITY = 'cag-population-v1'
+SUM_PIN = '09ee1d811d11c68ca47e3240d7a79dc5817ff200c45925581535f3e3e3bbe424'
+SUM_GATE = '3af1c72a86b178822b71c24830e885a5694fee8958affc3141c3e37e336dc288'
+SUM_REVISION = 'disjoint-az-sums-20261111'
+
+
+def release(pin):
+    if pin == SUM_PIN:
+        return dict(revision=SUM_REVISION, constructions=['AZ'], representations=['sum_cag', 'sum_other'], maps=12, tables=8, kind='sum')
+    require(pin == SOURCE_PIN, 'Unreviewed comb-mg scientific contract')
+    return dict(revision=REVISION, constructions=['AZ', 'ESZ', 'JPO'], representations=['mean', 'length_cag', 'length_other'], maps=54, tables=36, kind='mean')
 
 
 def sha_file(path):
@@ -57,20 +67,21 @@ def prepare(source, output):
     import numpy as np
     source, output = Path(source).resolve(), Path(output).resolve()
     require(not output.exists(), 'Choose a new output directory; existing packages are preserved')
-    checked(source / 'micove_assets.json', SOURCE_PIN)
+    pin = sha_file(source / 'micove_assets.json'); spec = release(pin)
+    if spec['kind'] == 'sum': checked(source / 'publication_verification.json', SUM_GATE)
     contract = json.loads((source / 'micove_assets.json').read_text())
     gate = json.loads((source / 'publication_verification.json').read_text())
     complete = json.loads((source / 'mds_complete.json').read_text())
-    require(gate['passed'] is True and complete['verified'] is True and complete['fits'] == 54,
+    require(gate['passed'] is True and complete['verified'] is True and complete['fits'] == spec['maps'],
             'Scientific publication gate has not passed')
     for name, sha in gate['files'].items():
         checked(source / name, sha)
     rows = contract['maps']
     keys = {map_key(r) for r in rows}
-    expected = {'|'.join(x + y) for x in itertools.product(['3.5k', '4k'], ['AZ', 'ESZ', 'JPO'],
-                ['mean', 'length_cag', 'length_other']) for y in [('l1', 'euclidean'), ('max', 'euclidean'), ('max', 'linf')]}
-    require(len(rows) == 54 and keys == expected and len(table(source / 'map_index.tsv')) == 54
-            and len(table(source / 'table_index.tsv')) == 36, 'Incomplete selector grid')
+    expected = {'|'.join(x + y) for x in itertools.product(['3.5k', '4k'], spec['constructions'],
+                spec['representations']) for y in [('l1', 'euclidean'), ('max', 'euclidean'), ('max', 'linf')]}
+    require(len(rows) == spec['maps'] and keys == expected and len(table(source / 'map_index.tsv')) == spec['maps']
+            and len(table(source / 'table_index.tsv')) == spec['tables'], 'Incomplete selector grid')
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='comb-mg-', dir=output.parent) as tmp:
         root = Path(tmp) / 'package'; root.mkdir(); (root / 'vme-assets').mkdir()
@@ -82,8 +93,8 @@ def prepare(source, output):
             desc = dict(url=url, sha256=digest, bytes=len(raw)); descriptors[url] = desc
             return desc
         def js(value): return publish(p.encoded(value), '.json')
-        data = dict(id=ID, revision=REVISION, title='Combined metagenomes · CAG compositions',
-                    sourceContractSha256=SOURCE_PIN, default=contract['default'], maps={}, tables={}, samples={},
+        data = dict(id=ID, revision=spec['revision'], title='Combined metagenomes · CAG compositions', abundanceKind=spec['kind'],
+                    sourceContractSha256=pin, default=contract['default'], maps={}, tables={}, samples={},
                     capabilities=dict(taxonCST=False, valencia=False, trajectories=False, localFits=False,
                                       cagFeatures=True, sampleMetadata=True),
                     cautions=contract['cautions'] + [
@@ -91,12 +102,12 @@ def prepare(source, output):
                         'Identity and individual body-site holds remain. Inferred links are not confirmed identities.',
                         'No confirmed visit order: participant trajectories are unavailable.',
                         'The 31 flagged L. iners-assigned genes remain present; their annotation is unresolved.',
-                        'All maps used 200 SGD epochs, not continuations of older sum-based maps; none certified convergence.'])
+                        'All maps used 200 SGD epochs; none certified convergence. These are independent fits, not continuations of earlier maps.'])
         populations = {}; verified = []
         for r in rows:
             key = map_key(r); tkey = '|'.join(key.split('|')[:-1])
             folder = Path(r['samples_tsv']).parent
-            receipt = json.loads((folder / 'complete.json').read_text())
+            receipt = json.loads((folder / ('preparation.json' if spec['kind'] == 'sum' else 'complete.json')).read_text())
             require(receipt['verified'] is True, 'Unverified abundance table')
             if tkey not in data['tables']:
                 for field in ['samples_tsv', 'features_tsv', 'abundance_npy', 'abundance_tsv']:
@@ -126,13 +137,35 @@ def prepare(source, output):
                 require(np.allclose(sums, 1, rtol=0, atol=1e-10), 'Normalization mismatch')
                 raw = np.asarray(a, dtype='<f8', order='C').tobytes()
                 require(p.sha(raw) == inp['matrix_sha256'], 'Saved binary/order differs from array')
+                extra = {}
+                if spec['kind'] == 'sum':
+                    accounting_path = folder / 'sample_accounting.tsv'
+                    for f in [Path(r['unclosed_tsv']), folder / 'raw_counts.npy', accounting_path]:
+                        checked(f, receipt['files'][str(f.relative_to(folder))])
+                    counts = np.load(folder / 'raw_counts.npy', mmap_mode='r', allow_pickle=False)
+                    accounting = table(accounting_path)
+                    require(counts.shape == a.shape and np.isfinite(counts).all() and (counts >= 0).all(), 'Invalid raw counts')
+                    require(unique(accounting, 'sample_id') == ids, 'Accounting sample axis mismatch')
+                    selected_reads = np.array([float(x['selected_reads']) for x in accounting])
+                    all_reads = np.array([float(x['all_in_scope_reads']) for x in accounting])
+                    fractions = np.array([float(x['fraction_retained']) for x in accounting])
+                    require(np.allclose(counts.sum(axis=1), selected_reads) and (selected_reads > 0).all()
+                            and (all_reads >= selected_reads).all() and np.allclose(fractions, selected_reads/all_reads), 'Raw read accounting mismatch')
+                    divisor = selected_reads if r['normalization'] == 'l1' else counts.max(axis=1)
+                    require(np.allclose(a, counts/divisor[:,None], rtol=1e-12, atol=1e-14), 'Sum normalization differs from saved table')
+                    residuals = sum(f['kind'] == 'species_other' for f in features)
+                    require(residuals == (647 if r['representation'] == 'sum_other' else 0), 'Residual category mismatch')
+                    if residuals: require(np.allclose(fractions, 1), 'Inclusive table does not retain all in-scope reads')
+                    extra = dict(medianReadFraction=float(np.median(fractions)), minimumReadFraction=float(fractions.min()),
+                                 residualCount=residuals, accounting=js(accounting), rawDownload=publish(Path(r['unclosed_tsv']).read_bytes(), '.tsv.gz'))
+                    del counts
                 # Stable feature order resolves display-only ties. No abundance changes.
                 top = np.argsort(-a, axis=1, kind='stable')[:, :5]
                 tops = [[[int(j), float(a[i,j])] for j in indices] for i, indices in enumerate(top)]
                 data['tables'][tkey] = dict(samples=r['samples'], featureCount=r['features'],
                     features=js(features), top=js(tops), matrix=publish(gzip.compress(raw, compresslevel=1, mtime=0), '.f64.gz'),
                     matrixSha256=inp['matrix_sha256'], samplesSha256=inp['sample_sha256'], featuresSha256=inp['features_sha256'],
-                    download=publish(Path(r['abundance_tsv']).read_bytes(), '.tsv.gz'))
+                    download=publish(Path(r['abundance_tsv']).read_bytes(), '.tsv.gz'), **extra)
                 del raw, a, top
             coords = table(r['coordinates_tsv']); checked(r['coordinates_tsv'], r['coordinates_sha256'])
             require(unique(coords, 'sample_id') == [x['sample_id'] for x in populations[r['dataset']]], 'Coordinate ID order mismatch')
@@ -152,14 +185,14 @@ def prepare(source, output):
             verified.append(dict(key=key, samples=len(coords), features=r['features'], exactIdOrder=True))
             print('Verified', key, flush=True)
         main = js({'combMgPopulation': data})
-        entry = dict(capability=CAPABILITY, dataset=dict(id=ID,title=data['title'],revision=REVISION,
+        entry = dict(capability=CAPABILITY, dataset=dict(id=ID,title=data['title'],revision=spec['revision'],
                      description='Exploratory frozen disjoint CAG compositions; identity and body-site holds retained.'),
                      parts=[main], resources=[d for d in descriptors.values() if d != main])
-        (root / 'manifest.json').write_bytes(p.encoded(dict(format='micove-comb-mg-v1', sourceContractSha256=SOURCE_PIN, entry=entry)))
+        (root / 'manifest.json').write_bytes(p.encoded(dict(format='micove-comb-mg-v1', sourceContractSha256=pin, entry=entry)))
         (root / 'validation.json').write_bytes(p.encoded(dict(passed=True, maps=verified, tables=len(data['tables']),
-            sourceContractSha256=SOURCE_PIN, scientificFitsRerun=False, coordinateValuesPreserved=True)))
+            sourceContractSha256=pin, scientificFitsRerun=False, coordinateValuesPreserved=True)))
         shutil.copy2(source / 'publication_verification.json', root / 'source-publication-verification.json')
-        (root / 'README.txt').write_text('MiCOVE comb-mg: 54 frozen mean-based CAG maps. No fits run by the adapter.\nInstall with portable.py update --comb-mg PACKAGE; updates remember this package.\nKeep the entire folder together. Values are float64 little-endian row-major in gzip.\nSource metadata and scientific holds are preserved; this is exploratory, not a taxon or cell abundance release.\n')
+        (root / 'README.txt').write_text(f'MiCOVE comb-mg: {spec["maps"]} frozen {spec["kind"]}-based CAG maps. No fits run by the adapter.\nInstall with portable.py update --comb-mg PACKAGE; updates remember this package.\nKeep the entire folder together. Values are float64 little-endian row-major in gzip.\nSource metadata and scientific holds are preserved; this is exploratory, not a taxon or cell abundance release.\n')
         root.rename(output)
     return output
 
@@ -167,10 +200,11 @@ def prepare(source, output):
 def package(directory):
     directory = Path(directory)
     m = json.loads((directory / 'manifest.json').read_text()); v = json.loads((directory / 'validation.json').read_text())
-    require(m['format'] == 'micove-comb-mg-v1' and m['sourceContractSha256'] == SOURCE_PIN
-            and v['passed'] is True and len(v['maps']) == 54 and v['tables'] == 36, 'Unreviewed/incomplete comb-mg package')
+    spec = release(m['sourceContractSha256'])
+    require(m['format'] == 'micove-comb-mg-v1' and v['sourceContractSha256'] == m['sourceContractSha256']
+            and v['passed'] is True and len(v['maps']) == spec['maps'] and v['tables'] == spec['tables'], 'Unreviewed/incomplete comb-mg package')
     require(m['entry']['capability'] == CAPABILITY and m['entry']['dataset']['id'] == ID
-            and m['entry']['dataset']['revision'] == REVISION, 'comb-mg identity mismatch')
+            and m['entry']['dataset']['revision'] == spec['revision'], 'comb-mg identity mismatch')
     for d in p.descriptors(m['entry']):
         f = p.asset_path(directory, d)
         require(f.stat().st_size == d['bytes'] and sha_file(f) == d['sha256'], 'Changed comb-mg asset: ' + str(f))

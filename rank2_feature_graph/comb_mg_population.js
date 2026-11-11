@@ -2,13 +2,21 @@
 const CombMg = (()=>{
  const populations=[['3.5k','3.5k reference · 3,544 profiles'],['4k','4k exploratory · 4,014 profiles']];
  const constructions=[['AZ','AZ · all samples, including zeros'],['ESZ','ESZ · exclude shared zeros'],['JPO','JPO · jointly positive only']];
- const representations=[['mean','Mean per CAG'],['length_cag','Length-corrected mean per CAG'],['length_other','Length-corrected means + species_other']];
+ const representations=[['mean','Mean per CAG'],['length_cag','Length-corrected mean per CAG'],['length_other','Length-corrected means + species_other'],['sum_cag','Summed counts · CAGs only'],['sum_other','Summed counts · CAGs + species_other']];
  const geometries=[['l1|euclidean','L1-normalized · Euclidean'],['max|euclidean','Max-normalized · Euclidean'],['max|linf','Max-normalized · L∞']];
  const groups={reference:'Reference',accepted_inferred_70:'Inferred LSVF links · 70',unresolved_400:'Unresolved identities · 400'};
  const groupColors={reference:'#0072B2',accepted_inferred_70:'#D55E00',unresolved_400:'#888888'};
+ const ctValue=v=>/^(?:|NA|N\/A|null|nan)$/i.test(String(v??'').trim())?'':String(v).trim();
  function key(s){return [s.population,s.construction,s.representation,s.geometry].join('|')}
  function rows(records,s){return records.map((r,i)=>({r,i})).filter(({r})=>(!s.cohort||r.study===s.cohort)&&(!s.group||r.exploratory_group===s.group))}
  function validate(data,s){if(!data.maps[key(s)])throw Error('This exact CAG map is unavailable. No substitute is shown.');return data.maps[key(s)]}
+ function options(data){const keys=Object.keys(data.maps).map(k=>k.split('|'));return {
+  populations:populations.filter(([v])=>keys.some(k=>k[0]===v)),constructions:constructions.filter(([v])=>keys.some(k=>k[1]===v)),
+  representations:representations.filter(([v])=>keys.some(k=>k[2]===v)),geometries:geometries.filter(([v])=>keys.some(k=>k.slice(3).join('|')===v))};}
+ function fractionLabel(s){return s.geometry.startsWith('max')?'Max-scaled value':s.representation==='sum_cag'?'Fraction of CAG reads':s.representation==='sum_other'?'Fraction of in-scope reads':'CAG fraction'}
+ function denominator(s,t){if(!s.representation.startsWith('sum_'))return '';
+  const inclusive=s.representation==='sum_other',scope=inclusive?'CAGs + '+t.residualCount+' residual species_other categories; all in-scope reads retained.':'CAGs only; residual reads excluded. Median retained read fraction: '+(100*t.medianReadFraction).toFixed(2)+'%.';
+  return 'Raw gene-count sums, without gene averaging or length correction. '+scope+' '+(s.geometry.startsWith('l1')?'L1 denominator: '+(inclusive?'all in-scope gene reads.':'CAG reads only.'):'Max denominator: the largest included '+(inclusive?'CAG or residual':'CAG')+' read count.');}
  const escape=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
  function csv(records){const fields=[...new Set(records.flatMap(Object.keys))];const cell=x=>'"'+String(x??'').replaceAll('"','""')+'"';return [fields,...records.map(r=>fields.map(k=>r[k]))].map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n'}
  async function bytes(d){
@@ -18,7 +26,7 @@ const CombMg = (()=>{
   const h=[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');
   if(h!==d.sha256)throw Error('CAG checksum differs; reload the page.');return b;
  }
- return {populations,constructions,representations,geometries,groups,groupColors,key,rows,validate,escape,csv,bytes};
+ return {populations,constructions,representations,geometries,options,fractionLabel,denominator,ctValue,groups,groupColors,key,rows,validate,escape,csv,bytes};
 })();
 if(typeof module!=='undefined')module.exports=CombMg;
 async function showCombMgPopulation(data,choices){
@@ -27,7 +35,8 @@ async function showCombMgPopulation(data,choices){
  let saved={};try{const x=JSON.parse(localStorage.getItem(storageKey));if(x?.identity===identity)saved=x}catch{}
  let s={population:data.default.dataset,construction:data.default.construction,representation:data.default.representation,
   geometry:data.default.normalization+'|'+data.default.target_metric,cohort:'',group:'',color:'cohort',feature:'',specimen:'',size:'3',opacity:'0.75',...saved.settings};
- try{CombMg.validate(data,s)}catch{s={...s,population:'3.5k',construction:'AZ',representation:'length_cag',geometry:'l1|euclidean'}}
+ try{CombMg.validate(data,s)}catch{s={...s,population:data.default.dataset,construction:data.default.construction,representation:data.default.representation,geometry:data.default.normalization+'|'+data.default.target_metric}}
+ const available=CombMg.options(data);
  const style=document.createElement('style');style.textContent=`
  .combMg [hidden]{display:none!important}.combMg label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.combMg select,.combMg input{max-width:100%;min-width:0}.combMg small{display:block;line-height:1.4}.combMg details{margin:10px 0;border-top:1px solid #d3e0e5;padding-top:8px}.combMg summary{font-weight:600;cursor:pointer}.combMg table{width:100%;font-size:12px;border-collapse:collapse}.combMg td,.combMg th{padding:4px;border-bottom:1px solid #e0e8eb;text-align:left;overflow-wrap:anywhere}.combMgNotice{padding:8px;background:#fff3d8;border-left:3px solid #d89b28;font-size:12px;line-height:1.4}.combMgStatus{padding:8px;line-height:1.45}.combMgSelected{font-weight:600;color:#a54500}#samplePanel.combMg{height:100%;min-height:520px}#samplePanel.combMg #sampleSidePanels{overflow:auto;flex:0 0 350px;padding:8px 12px;box-sizing:border-box}#samplePanel.combMg #sampleContent{display:flex;flex:1;min-height:0}#samplePanel.combMg #samples{position:relative;flex:1;min-width:120px;height:100%}#samplePanel.combMg #sampleInfoDivider{display:none}.combMg .sampleHeaderActions{flex-wrap:wrap}.combMg dialog{max-width:640px;max-height:85vh;overflow:auto}#samplePanel.combMgExpanded{position:fixed;inset:8px;z-index:1000;height:calc(100vh - 16px)}
  @media(max-width:900px){#samplePanel.combMg #sampleContent{flex-direction:column}#samplePanel.combMg #sampleSidePanels{flex:0 0 260px;width:auto;max-height:35vh}#samplePanel.combMg #samples{min-height:300px;height:auto}}
@@ -44,18 +53,19 @@ async function showCombMgPopulation(data,choices){
  const dataset=$('datasetSelect');dataset.disabled=false;dataset.value=data.id;
  const datasetField=dataset.closest('label')||field('Dataset',dataset,document.createElement('div')).parentElement;
  controls.replaceChildren(datasetField);$('controlSections').replaceChildren(dataSection);dataSection.classList.add('combMg');
- const population=select('combMgPopulation','Population',CombMg.populations,controls);
+ const population=select('combMgPopulation','Population',available.populations,controls);
  const cohort=select('combMgCohort','Cohort',[['','All']],controls);
  const group=select('combMgGroup','Identity group',[['','All groups']],controls);
  const notice=make('p','Exploratory CAG compositions. Individual body-site and identity holds remain.',controls);notice.className='combMgNotice';
  make('small','Confirmed/inherited participant IDs and inferred links stay separate. No confirmed visit order is available; trajectories and taxonomic CSTs are not enabled.',controls);
  dataset.onchange=()=>{const u=new URL(location.href);u.searchParams.set('dataset',dataset.value);u.searchParams.delete('cohort');location.assign(u.href)};
  $('toggleControls').disabled=false;$('toggleControls').onclick=()=>{const close=$('explorerLayout').classList.toggle('controlsCollapsed');$('controlSections').hidden=close;requestAnimationFrame(()=>Plotly.Plots.resize(plot))};
- const construction=select('combMgConstruction','CAG construction',CombMg.constructions,side);
+ const construction=select('combMgConstruction','CAG construction',available.constructions,side);construction.disabled=available.constructions.length===1;
  construction.title='Frozen species-wise correlation masks: AZ includes zeros; ESZ omits jointly zero observations; JPO uses jointly positive observations. Each construction has its own disjoint gene groups.';
- const representation=select('combMgAbundance','Abundance definition',CombMg.representations,side);
- representation.title='Means divide by all genes in the fixed group, including genes with zero counts. Length correction divides each gene count by its nucleotide length first. species_other contains heterogeneous residual categories.';
- const geometry=select('combMgGeometry','Sample embedding',CombMg.geometries,side);
+ const representation=select('combMgAbundance','Abundance definition',available.representations,side);
+ representation.title=data.abundanceKind==='sum'?'Sum raw gene counts within each disjoint AZ CAG. Including species_other retains residual reads and changes the normalization denominator; residual categories are not coherent CAGs.':'Means divide by all genes in the fixed group, including genes with zero counts. Length correction divides each gene count by its nucleotide length first. species_other contains heterogeneous residual categories.';
+ const geometry=select('combMgGeometry','Sample embedding',available.geometries,side);
+ const denominatorNote=make('small',null,side);denominatorNote.id='combMgDenominator';
  const summary=make('div',null,side);summary.id='combMgSummary';summary.className='combMgStatus';summary.setAttribute('role','status');
  const coloring=details('Sample coloring',side,true);
  const color=select('combMgColor','Color by',[['cohort','Cohorts'],['group','Identity group'],['mapping','Mapping status'],['ct','CT persistence · source coding'],['feature','CAG / residual feature']],coloring);
@@ -68,11 +78,13 @@ async function showCombMgPopulation(data,choices){
  const specimen=select('combMgSpecimen','Inspect sample',[['','Choose a sample']],side);
  const inspection=make('div',null,side);inspection.id='combMgInspection';
  const methods=details('Methods, interpretation and downloads',side);
- make('p','Each point is a sample profile. Selecting cohorts or identity groups restricts the saved population coordinates; it does not fit a local map. Axes are not aligned across the 54 independent fits.',methods);
+ make('p','Each point is a sample profile. Selecting cohorts or identity groups restricts the saved population coordinates; it does not fit a local map. Axes are not aligned across the '+Object.keys(data.maps).length+' independent fits.',methods);
  for(const caution of data.cautions)make('p',caution,methods);
- make('p','Ordinary means: sum of gene counts / number of genes. Length-corrected means: sum of count / nucleotide length, divided by number of genes. L1 divides by the sum of displayed feature values; max divides by their maximum. Common sample denominators cancel. Residual species_other values are means, not sums.',methods);
+ make('p',data.abundanceKind==='sum'?'Each feature sums raw counts over its fixed disjoint gene set. No gene averaging or length correction is applied. L1 divides by the sum of included features; max divides by their maximum. CAG-only L1 uses CAG reads, while the inclusive version uses all in-scope gene reads. Removing species_other changes the table and denominator, rather than merely hiding categories.':'Ordinary means: sum of gene counts / number of genes. Length-corrected means: sum of count / nucleotide length, divided by number of genes. L1 divides by the sum of displayed feature values; max divides by their maximum. Common sample denominators cancel. Residual species_other values are means, not sums.',methods);
  const exportCSV=button('combMgCSV','Export displayed samples CSV',methods),exportFeatures=button('combMgFeaturesCSV','Export feature metadata CSV',methods);
  const abundanceLink=make('a','Download full normalized table (TSV.gz)',methods);abundanceLink.style.display='block';
+ const rawLink=make('a','Download raw summed counts (TSV.gz)',methods);rawLink.style.display='block';
+ const accountingCSV=button('combMgAccountingCSV','Export retained-read accounting CSV',methods);accountingCSV.hidden=data.abundanceKind!=='sum';
  const downloadArea=make('div',null,methods);
  const header=panel.querySelector('.sampleHeaderActions');header.replaceChildren();
  const back=button('combMgBack','← Back',header),forward=button('combMgForward','Forward →',header),clear=button('combMgClear','Clear selection',header);
@@ -104,7 +116,7 @@ async function showCombMgPopulation(data,choices){
   if(s.color==='feature')return {label:'Choose a feature',color:'#999999'};
   if(s.color==='group')return {label:CombMg.groups[r.exploratory_group],color:CombMg.groupColors[r.exploratory_group]};
   if(s.color==='mapping'){const label=r.mapping_status||'Unavailable';return {label,color:sampleCohortColor(label)}}
-  if(s.color==='ct'){const v=r.ct_outcome_persist;return {label:v?'CT outcome_persist = '+v:'Unavailable',color:v==='1'?'#D55E00':v==='0'?'#0072B2':v?sampleCohortColor(v):'#999999'}}
+  if(s.color==='ct'){const v=CombMg.ctValue(r.ct_outcome_persist);return {label:v?'CT outcome_persist = '+v:'Unavailable',color:v==='1'?'#D55E00':v==='0'?'#0072B2':v?sampleCohortColor(v):'#999999'}}
   return {label:r.study||'Unclassified',color:sampleCohortColor(r.study)};
  }
  function inspect(){
@@ -137,7 +149,7 @@ async function showCombMgPopulation(data,choices){
      '<br>Identity/body-site holds retained'+top[i].map(([j,v])=>'<br>'+E(features[j].feature)+': '+v.toPrecision(4)).join('');
    const points=new Map();for(const row of visible){const cat=values?{label:'Feature value',color:null}:categorise(row.r);if(!points.has(cat.label))points.set(cat.label,{...cat,rows:[]});points.get(cat.label).rows.push(row)}
    for(const [label,g] of points){const p=g.rows,marker={size:Number(s.size),opacity:Number(s.opacity),color:values?p.map(({i})=>values[i*features.length+featureIndex]):g.color};
-    if(values)Object.assign(marker,{colorscale:'Viridis',showscale:true,cmin:0,cmax:Math.max(...p.map(({i})=>values[i*features.length+featureIndex]),1e-12),colorbar:{title:{text:s.geometry.startsWith('l1')?'CAG fraction':'Max-scaled value'},thickness:12}});
+    if(values)Object.assign(marker,{colorscale:'Viridis',showscale:true,cmin:0,cmax:Math.max(...p.map(({i})=>values[i*features.length+featureIndex]),1e-12),colorbar:{title:{text:CombMg.fractionLabel(s)},thickness:12}});
     traces.push({type:'scatter3d',mode:'markers',meta:{agpGraphVertices:true},name:label,x:p.map(({i})=>xyz[i][0]),y:p.map(({i})=>xyz[i][1]),z:p.map(({i})=>xyz[i][2]),marker,customdata:p.map(({r})=>({id:r.sample_id,edge:false})),text:p.map(hover),hovertemplate:'%{text}<extra></extra>',showlegend:false});
     counts.set(label,{n:p.length,color:g.color});
    }
@@ -147,6 +159,7 @@ async function showCombMgPopulation(data,choices){
    await Plotly.react(plot,traces,layout,{responsive:true,displaylogo:false,displayModeBar:false});if(attempt!==serial)return;
    currentFrame=key;plot.style.visibility='visible';
    active={records,features,xyz,top,visible,map,table,key};
+   denominatorNote.textContent=CombMg.denominator(selected,table);denominatorNote.hidden=!denominatorNote.textContent;
    $('sampleTitle').textContent='Combined metagenomes · '+selected.population+' · '+selected.construction;
    stress.textContent='RMS relative error: '+map.rmsRelativeErrorPercent.toFixed(2)+'% (all pairs)'+(visible.length!==records.length?' · full fitted population':'');
    stress.title='Click for the definition. Subsets restrict population coordinates; the displayed error belongs to the full fitted population.';
@@ -155,6 +168,7 @@ async function showCombMgPopulation(data,choices){
    for(const [label,v] of counts){const row=make('div',null,legend);if(v.color){const sw=make('span','■ ',row);sw.style.color=v.color}row.append(document.createTextNode(label+' · '+v.n+' · '+(100*v.n/Math.max(visible.length,1)).toFixed(2)+'%'))}
    featureInfo.textContent=featureIndex<0?'Choose a feature to inspect or color. Feature identities are specific to this population and construction.':fieldName(features[featureIndex])+'. '+(features[featureIndex].kind==='CAGC'?'Disjoint CAG.':'Residual accounting category; not a coherent CAG.')+' Values are CAG compositions, not taxon or cell proportions.';
    abundanceLink.href=table.download.url;abundanceLink.download='comb-mg-'+map.table.replaceAll('|','-')+'.tsv.gz';
+   rawLink.hidden=!table.rawDownload;if(table.rawDownload){rawLink.href=table.rawDownload.url;rawLink.download='comb-mg-'+map.table.replaceAll('|','-')+'-raw-counts.tsv.gz'}
    back.disabled=historyIndex===0;forward.disabled=historyIndex===selectionHistory.length-1;clear.disabled=!s.specimen&&!s.cohort&&!s.group;
    inspect();persist();
   }catch(error){if(attempt===serial){summary.textContent='Unable to show this map: '+error.message;plot.style.visibility='hidden';active=null}throw error}
@@ -170,6 +184,7 @@ async function showCombMgPopulation(data,choices){
  exportCSV.onclick=()=>{if(!active)return;const records=active.visible.map(({r,i})=>({...r,x:active.xyz[i][0],y:active.xyz[i][1],z:active.xyz[i][2],map:active.key,coordinate_metric:'euclidean',target_metric:active.map.targetMetric,
   full_population_rms_relative_error_percent:active.map.rmsRelativeErrorPercent,source_contract_sha256:identity}));download(CombMg.csv(records),'comb-mg-displayed-samples.csv','text/csv')};
  exportFeatures.onclick=()=>active&&download(CombMg.csv(active.features),'comb-mg-feature-metadata.csv','text/csv');
+ accountingCSV.onclick=async()=>{if(active?.table.accounting)download(CombMg.csv(await json(active.table.accounting)),'comb-mg-retained-read-accounting.csv','text/csv')};
  const dialog=make('dialog',null,panel),dialogBody=make('div',null,dialog),close=button('combMgDialogClose','Close',dialog);close.onclick=()=>dialog.close();
  stress.onclick=()=>{dialogBody.innerHTML='<h3>How closely does the 3D map preserve target distances?</h3><p>RMS relative distance error is</p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mn>100</mn><mo>×</mo><msqrt><mrow><mfrac><mn>1</mn><mi>M</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>&lt;</mo><mi>j</mi></mrow><mrow/></munderover><msup><mrow><mo>(</mo><mfrac><mrow><msub><mi>d</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>δ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><msub><mi>δ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow></msqrt><mo>%</mo></mrow></math><p>δ is the target distance between full normalized CAG profiles; d is their Euclidean distance in the saved 3D map. M is the number of unordered sample pairs. All pairs have positive targets. Smaller errors indicate closer distance approximation, not greater biological validity.</p><p>Each map used full metric MDS with SGD, inverse-squared target weights, one PCA start, seed 20261015 and 200 epochs. Best saved epoch: '+active?.map.bestEpoch+'. Convergence was not certified. The error refers to the full fitted population, including when only a cohort or identity group is visible.</p>';dialog.showModal()};
  named.onclick=()=>{dialogBody.replaceChildren();make('h3','Named views · comb-mg',dialogBody);const name=make('input');field('Name',name,dialogBody);const list=select('combMgNamedList','Saved view',namedViews.map((v,i)=>[String(i),v.name]),dialogBody);

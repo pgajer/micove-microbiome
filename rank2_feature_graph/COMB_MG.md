@@ -1,8 +1,89 @@
 # Combined metagenomic CAG compositions
 
+## Current release: disjoint AZ sums
+
+The current optional `comb-mg` release contains **12 saved 3D maps**: two
+populations, two abundance definitions and three geometries. It replaces the
+withdrawn mean-based release. Older sums based on overlapping gene memberships
+are not substituted. No models are fitted during installation or viewing.
+
+The initial view is **3.5k reference · AZ · summed CAGs + species_other ·
+L1-normalized Euclidean**. Saved preferences are bound to this scientific
+revision, so preferences from the withdrawn release cannot select a mean map.
+
+| Population | Profiles | CAGs only | CAGs + species_other |
+|---|---:|---:|---:|
+| 3.5k reference | 3,544 | 1,896 features | 2,543 features |
+| 4k exploratory | 4,014 | 1,901 features | 2,548 features |
+
+AZ identifies the fixed species-wise correlation construction that includes
+zero observations. The catalogue's final gene memberships are disjoint. Each
+feature sums raw gene read counts over its fixed gene set; no division by gene
+number or gene length is applied. The 647 `species_other` categories contain
+residual genes and are not coherent co-abundance clusters.
+
+**The denominator matters.** CAG-only L1 fractions divide by CAG reads only;
+the median retained fraction of all in-scope reads is 62.14% for 3.5k and 60.23%
+for 4k. Inclusive L1 fractions divide by all in-scope gene reads. Removing
+`species_other` changes the table and denominator, rather than merely hiding
+categories. Max normalization divides by the largest included feature count.
+The sidebar explains the active denominator. Normalized tables, raw summed
+counts and per-sample retained-read accounting can be exported.
+
+Each table has L1–Euclidean, max–Euclidean and max–L∞ maps. All output-coordinate
+distances are Euclidean. Fits use full metric MDS with SGD, inverse-squared
+target-distance weights, one PCA start, seed 20261015 and 200 epochs. All selected
+epoch 200; none certified convergence. The error button reports independently
+verified all-pairs RMS relative distance error for the full fitted population,
+including when filters restrict the display. Independently fitted axes are not
+aligned.
+
+The additional **70 inferred LSVF links** and **400 unresolved identities** stay
+separate from the 3,544 reference profiles. Original metadata and identity/body-site
+holds remain. Filters restrict saved coordinates; inclusion is not confirmation
+of eligibility or identity. No confirmed visit order is available, so trajectories
+are not enabled. Read compositions are not cell or strain proportions; CAGs do
+not receive invented taxonomic CST or VALENCIA assignments. The 31 flagged
+L. iners-assigned genes retain their unresolved annotation caution.
+
+### Installation and verification
+
+Obtain the separately distributed package from Pawel Gajer. Keep it outside the
+app folder, then use:
+
+```sh
+python3 ~/micove-source/scripts/portable.py update --comb-mg /path/to/MiCOVE-comb-mg-sums-package
+```
+
+The usual update remembers this package path; it does not download datasets.
+Maintainers prepare the package with `scripts/comb_mg_supplement.py --source
+/path/to/reviewed/results --output /path/to/new/package`. The adapter verifies the
+pinned scientific contract, publication gate, axes, group counts, raw-read
+accounting, normalization and map-error receipts. It preserves float64 values
+and exact saved coordinates. A local `.preview/comb-mg.json` registration points
+to the prepared package; an ordinary build only validates and attaches it.
+
+Checks are on demand, outside installation and updates:
+
+```sh
+MICOVE_COMB_MG_PACKAGE=/path/to/package python3 -m unittest discover -s scripts -p test_comb_mg_supplement.py
+node rank2_feature_graph/test_comb_mg_population.cjs /path/to/package
+```
+
+Before release, also inspect all 12 saved maps in the browser, both populations,
+residual and denominator labels, 70/400 identity filters, feature coloring,
+metadata inspection, exports, saved choices and an unaffected dataset. Automated
+selector tests alone do not establish actual 3D rendering.
+
+## Historical mean-based release — withdrawn
+
+The following preserves the former release's methods and reproduction commands.
+It is not current installation guidance. Its generated data remain withdrawn;
+the generating and viewer support code is retained.
+
 **Release withdrawn, 11 November 2026.** The 54 mean-based CAG maps and their
 data package have been removed from the current distribution at the investigator's
-request. A replacement based on summed abundances is pending. Older summed maps
+request. It was replaced by the disjoint AZ sums described above. Older summed maps
 used overlapping memberships and are not substituted for this disjoint catalogue.
 The adapter, viewer and generating code are retained. The contract and commands
 below document the withdrawn release; they are not current installation guidance.
