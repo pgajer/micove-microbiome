@@ -210,3 +210,7 @@
 !/scripts/comb_mg_local.py
 
 !/scripts/comb_mg_local_mds.R
+
+!/rank2_feature_graph/comb_mg_graph_labels.js
+
+!/rank2_feature_graph/test_comb_mg_graph_labels.cjs

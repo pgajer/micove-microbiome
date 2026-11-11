@@ -103,6 +103,15 @@ centroids nor a new graph fit. Graph positions remain unchanged when a local
 sample map opens.
 Both panels can be maximized; on narrow screens the graph sits below the samples.
 
+In the 3D graph, names are separate clickable labels positioned to avoid each
+other and the spheres. Leader lines connect displaced labels to their reference
+vertices. Placement follows camera rotation, zoom and panel size without changing
+coordinates. Selected states and larger states have priority when space is
+limited; the panel reports how many labels fit. All states remain available in
+**Selected state**, including temporarily unlabelled spheres. Labels also accept
+keyboard activation. A drag or a click from an outdated render cannot select a
+state; a label always uses its own state identifier, never a nearby sphere.
+
 **Sample appearance → Reference vertices** marks each displayed taxon's observed
 maximum-abundance sample at its saved 3D coordinates. Its label includes the actual
 raw-read fraction; it is not a hypothetical pure-taxon corner or state centroid.

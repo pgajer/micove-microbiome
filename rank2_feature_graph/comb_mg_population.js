@@ -78,7 +78,7 @@ async function showCombMgPopulation(data,choices){
  .combMgStateNode:hover,.combMgStateNode:focus-visible{background:#eef5f7;border-color:#b6cbd3}.combMgStateNode[aria-pressed=true]{border-color:#d55e00;background:#fff5e9}
  .combMgStateSphereSlot{display:flex;align-items:center;justify-content:center;min-height:78px;flex-shrink:0}
  .combMgStateSphere{display:block;border-radius:50%;background-color:var(--taxon-color);background-image:radial-gradient(circle at 32% 25%,rgba(255,255,255,.9) 0%,rgba(255,255,255,.25) 15%,transparent 40%,rgba(0,0,0,.45) 100%)}
- #combMgStatePlot{flex:1;min-height:300px;width:100%}#combMgGraphStatus{padding:8px 0;line-height:1.45;font-size:12px}
+ #combMgGraphStage{position:relative;flex:1;min-height:320px;width:100%}#combMgStatePlot{position:absolute;inset:0;width:100%;height:100%}.combMgGraphLabels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}.combMgGraphLabels svg{position:absolute;inset:0;pointer-events:none}.combMgGraphLabels line{stroke:#8b9da5;stroke-width:.8}.combMgGraphLabel{position:absolute;box-sizing:border-box;width:max-content;max-width:min(210px,calc(100% - 12px));padding:3px 5px;border:1px solid #d4e0e5;border-radius:4px;background:rgba(255,255,255,.95);color:#173846;font:11px/14px Arial,sans-serif;cursor:pointer;pointer-events:auto;text-align:center;white-space:normal;overflow-wrap:anywhere}.combMgGraphLabel span{display:block}.combMgGraphLabel small{font-size:10px;line-height:13px;white-space:nowrap}.combMgGraphLabel[aria-pressed=true]{background:#fff0d8;border-color:#d55e00}.combMgGraphLabel:hover,.combMgGraphLabel:focus-visible{outline:2px solid #517a8e;outline-offset:0}#combMgGraphLabelNote{font-size:12px;min-height:36px;margin:5px 0}#combMgGraphStatus{padding:8px 0;line-height:1.45;font-size:12px}
  #combMgGraphPanel.combMgExpanded{position:fixed;inset:8px;z-index:1000;min-height:0;height:calc(100vh - 16px)}
  @media(max-width:1200px){#panelWorkspace.combMgWorkspace{grid-template-columns:1fr;grid-template-rows:minmax(580px,1fr) minmax(480px,1fr)}#combMgGraphPanel{grid-area:2/1;min-height:480px}}
  `;document.head.append(style);panel.classList.add('combMg');
@@ -104,7 +104,9 @@ async function showCombMgPopulation(data,choices){
  const stateGraphSize=slider('combMgStateGraphSize','Sphere size',25,300,5,graphControls,'%');
  make('small','Sphere area is proportional to full-population state sample count. Colors identify the same pure states as Leading taxon coloring. No connections are inferred.',graphControls);
  const graphGrid=make('div',null,graphPanel);graphGrid.id='combMgStateGrid';graphGrid.setAttribute('aria-label','Pure 1-CST state spheres');
- const graphPlot=make('div',null,graphPanel);graphPlot.id='combMgStatePlot';graphPlot.hidden=true;
+ const graphLabelNote=make('div',null,graphPanel);graphLabelNote.id='combMgGraphLabelNote';graphLabelNote.hidden=true;graphLabelNote.setAttribute('role','status');
+ const graphStage=make('div',null,graphPanel);graphStage.id='combMgGraphStage';graphStage.hidden=true;
+ const graphPlot=make('div',null,graphStage);graphPlot.id='combMgStatePlot';graphPlot.hidden=true;
  graphPanel.style.display=data.taxonContext?'':'none';
  const dataSection=$('dataControls'),controls=dataSection.querySelector('.sectionControls');
  const dataset=$('datasetSelect');dataset.disabled=false;dataset.value=data.id;for(const option of dataset.options)if(option.value===data.id)option.textContent='comb-mg';
@@ -161,6 +163,8 @@ async function showCombMgPopulation(data,choices){
  const stress=$('sampleStress');stress.disabled=false;stress.hidden=false;
  let active=null,serial=0,selectionHistory=[CombMg.selection({})],historyIndex=0,cameras=saved.cameras||{},namedViews=saved.namedViews||[],jsonCache=new Map(),matrixCache=null;
  let currentFrame=null,graphFrame=null,pickingInstalled=false,graphPickingInstalled=false;
+ const graphLabels=CombMgGraphLabels.install({plot:graphPlot,host:graphStage,note:graphLabelNote,select:taxon=>selectState(taxon).catch(console.error),revision:()=>serial});
+ new ResizeObserver(()=>{if(!graphPlot.hidden)Plotly.Plots.resize(graphPlot)}).observe(graphStage);
  const bindings={population,construction,representation,geometry,cohort,group,color,feature,specimen,size,opacity,taxonCoverage,stateTaxon,stateGraphLayout,stateGraphSize,showReferences,sphereReferences,referenceSize,referenceColor,referenceAmbient,referenceHighlights,referenceLabelSize};
  function restoreControls(){for(const [k,n] of Object.entries(bindings))if(n.type==='checkbox')n.checked=s[k];else if(n.tagName==='SELECT'){if([...n.options].some(o=>o.value===s[k]))n.value=s[k]}else n.value=s[k]}
  restoreControls();
@@ -212,8 +216,8 @@ async function showCombMgPopulation(data,choices){
    (s.stateGraphLayout==='grid'?'Grid order is by frequency; positions do not encode distances.':'Positions are observed reference specimens in the population MDS; no new fit is computed.');
   stateTaxon.replaceChildren(new Option('All states',''),...nodes.map(t=>new Option(t.taxon.replaceAll('_',' ')+' · '+t.n,t.taxon)));stateTaxon.value=s.stateTaxon;
   allStates.disabled=!s.stateTaxon;stateGraphSize._display();
-  graphGrid.hidden=s.stateGraphLayout!=='grid';graphPlot.hidden=s.stateGraphLayout!=='references';
-  if(!graphGrid.hidden){graphGrid.style.gridTemplateColumns='repeat(auto-fit,minmax('+Math.max(140,72*Number(s.stateGraphSize)/100+24)+'px,1fr))';graphGrid.replaceChildren();for(const t of nodes){
+  graphGrid.hidden=s.stateGraphLayout!=='grid';graphPlot.hidden=s.stateGraphLayout!=='references';graphStage.hidden=graphPlot.hidden;graphLabelNote.hidden=graphPlot.hidden;
+  if(!graphGrid.hidden){graphLabels.set([],s.stateTaxon,false);graphGrid.style.gridTemplateColumns='repeat(auto-fit,minmax('+Math.max(140,72*Number(s.stateGraphSize)/100+24)+'px,1fr))';graphGrid.replaceChildren();for(const t of nodes){
    const b=button('',null,graphGrid);b.removeAttribute('id');b.className='combMgStateNode';b.dataset.taxon=t.taxon;
    b.setAttribute('aria-label','Select pure 1-CST '+t.taxon.replaceAll('_',' '));b.setAttribute('aria-pressed',String(s.stateTaxon===t.taxon));
    b.title=t.taxon.replaceAll('_',' ')+' · '+t.n+' samples ('+(100*t.fraction).toFixed(2)+'% of full population) · '+t.filteredCount+' within current cohort/identity filters';
@@ -224,21 +228,20 @@ async function showCombMgPopulation(data,choices){
    b.onclick=()=>selectState(t.taxon).catch(console.error);
   }}else{
    const span=Math.max(...[0,1,2].map(j=>Math.max(...xyz.map(p=>p[j]))-Math.min(...xyz.map(p=>p[j]))))||1;
-   const traces=nodes.map(t=>({...vertexSphereMesh(t.point,span*.035*Number(s.stateGraphSize)/100*t.radiusFraction,{ambient:85,highlights:18}),
+   for(const t of nodes)t.sphereRadius=span*.035*Number(s.stateGraphSize)/100*t.radiusFraction;
+   const traces=nodes.map(t=>({...vertexSphereMesh(t.point,t.sphereRadius,{ambient:85,highlights:18}),
     color:trajectoryTaxonColor(t.taxon,{}),meta:{graphSphere:t.taxon},text:E(t.taxon.replaceAll('_',' '))+'<br>'+t.n+' samples · '+(100*t.fraction).toFixed(2)+'%<br>'+t.filteredCount+' within current filters<br>Reference specimen: '+E(t.referenceSample),hovertemplate:'%{text}<extra></extra>',showlegend:false}));
-   const annotations=nodes.map((t,i)=>({name:'agp-vertex:'+t.taxon,x:t.point[0],y:t.point[1],z:t.point[2],text:E(t.taxon.replaceAll('_',' '))+'<br>'+t.n+' · '+(100*t.fraction).toFixed(2)+'%',
-    showarrow:true,arrowhead:0,arrowwidth:1,ax:i%2?20:-20,ay:i%3?-25:25,bgcolor:s.stateTaxon===t.taxon?'#fff0d8':'rgba(255,255,255,.85)',bordercolor:s.stateTaxon===t.taxon?'#d55e00':'transparent',font:{size:11,color:'#173846'}}));
    const chosen=nodes.find(t=>t.taxon===s.stateTaxon);if(chosen)traces.push({type:'scatter3d',mode:'markers',x:[chosen.point[0]],y:[chosen.point[1]],z:[chosen.point[2]],marker:{symbol:'circle-open',size:22,color:'#d55e00',line:{width:3}},hoverinfo:'skip',showlegend:false});
    const frame='graph|'+key;
-   await Plotly.react(graphPlot,traces,{margin:{l:0,r:0,t:0,b:0},showlegend:false,uirevision:frame,scene:{aspectmode:'data',camera:cameras[frame]||{projection:{type:'orthographic'}},annotations,xaxis:{visible:false},yaxis:{visible:false},zaxis:{visible:false}}},{responsive:true,displayModeBar:false,displaylogo:false});
-   if(attempt!==serial)return;graphFrame=frame;
+   await Plotly.react(graphPlot,traces,{margin:{l:0,r:0,t:0,b:0},showlegend:false,uirevision:frame,scene:{aspectmode:'data',camera:cameras[frame]||{projection:{type:'orthographic'}},annotations:[],xaxis:{visible:false},yaxis:{visible:false},zaxis:{visible:false}}},{responsive:true,displayModeBar:false,displaylogo:false});
+   if(attempt!==serial)return;graphFrame=frame;graphLabels.set(nodes,s.stateTaxon,true);
    if(!graphPickingInstalled){installAgpGraphPicking(graphPlot,item=>selectState(item.id).catch(console.error),()=>serial);graphPlot.on('plotly_relayout',persist);graphPickingInstalled=true}
   }
  }
  resetHistory();
  async function render(){
   rememberCamera();const attempt=++serial;const selected={...s},key=CombMg.key(selected),map=CombMg.validate(data,selected),table=data.tables[map.table];
-  active=null;for(const n of [exportCSV,exportFeatures,accountingCSV,taxonCSV,png,stateTaxon,allStates])n.disabled=true;
+  active=null;graphLabels.suspend();for(const n of [exportCSV,exportFeatures,accountingCSV,taxonCSV,png,stateTaxon,allStates])n.disabled=true;
   for(const b of graphGrid.querySelectorAll('button'))b.disabled=true;graphPlot.style.pointerEvents='none';
   summary.textContent='Loading the matching saved map…';plot.style.visibility='hidden';
   try{

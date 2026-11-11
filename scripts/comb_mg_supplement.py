@@ -311,7 +311,7 @@ def viewer_bytes():
     shared = (p.HERE/'valencia2.js').read_text().split('const sampleMajorCohortColors=', 1)[1].split('function sampleColorCategory', 1)[0]
     taxon_colors = (p.HERE/'subject_trajectory.js').read_text().split('function trajectoryTaxonKey(', 1)[1].split('function trajectoryTaxonHex', 1)[0]
     palette = p.encoded(p.load_palette(p.HERE))
-    return b'(() => {\nconst VMRC_TAXON_PALETTE=' + palette + b';\nfunction trajectoryTaxonKey(' + taxon_colors.encode() + b'\nconst sampleMajorCohortColors=' + shared.encode() + b'\n' + (p.HERE/'sphere_geometry.js').read_bytes() + b'\n' + (p.HERE/'png_export.js').read_bytes() + b'\n' + (p.HERE/'agp_graph_picking.js').read_bytes() + b'\n' + (p.HERE/'comb_mg_population.js').read_bytes() + b'\n})();'
+    return b'(() => {\nconst VMRC_TAXON_PALETTE=' + palette + b';\nfunction trajectoryTaxonKey(' + taxon_colors.encode() + b'\nconst sampleMajorCohortColors=' + shared.encode() + b'\n' + (p.HERE/'sphere_geometry.js').read_bytes() + b'\n' + (p.HERE/'png_export.js').read_bytes() + b'\n' + (p.HERE/'agp_graph_picking.js').read_bytes() + b'\n' + (p.HERE/'comb_mg_graph_labels.js').read_bytes() + b'\n' + (p.HERE/'comb_mg_population.js').read_bytes() + b'\n})();'
 
 
 def annotation_upgrade(old, new, old_root, new_root):
