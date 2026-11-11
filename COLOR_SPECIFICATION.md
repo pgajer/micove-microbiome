@@ -60,6 +60,13 @@ these raw-read labels. Reference spheres use the observed maximum-abundance
 sample per displayed taxon, with its actual raw-read percentage and the ordinary
 sample-reference appearance controls. Neither markers nor coloring alter sample
 membership, counts or saved coordinates; no merged states are inferred.
+The linked pure 1-CST graph uses the same retained states and taxon colors,
+with sphere area proportional to full-population sample count. Graph counts
+remain fixed under selection and cohort/identity filters. Clicking a sphere
+restricts the sample view to that state within the current filters, without
+changing coordinates or labels. The frequency grid has no distance meaning;
+the optional 3D layout uses the existing observed reference coordinates.
+No inter-state edges are inferred.
 See [the CAG dataset contract](rank2_feature_graph/COMB_MG.md).
 
 LSVF query supplements extend saved outcome and feature fields to 26 specimens

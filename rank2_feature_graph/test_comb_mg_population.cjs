@@ -20,6 +20,23 @@ for(const [pop,d] of Object.entries(data.taxonContext||{})){
  assert.equal(C.taxonDisplay(context,100).n,records.length);
  assert(context.taxa.every((t,i)=>i===0||context.taxa[i-1].n>=t.n));
  for(const t of shown.taxa)assert.equal(t.referenceSample,records[t.referenceIndex].sample_id);
+ const xyz=read(data.maps[pop+'|AZ|sum_other|l1|euclidean'].coordinates),filtered=C.rows(records,{cohort:'',group:''}),nodes=C.stateGraph(context,shown,xyz,filtered);
+ assert.equal(nodes.length,8);
+ for(const node of nodes){
+  assert.equal(node.filteredCount,node.n);
+  assert(Math.abs(node.radiusFraction**2-node.n/context.taxa[0].n)<1e-12,'Sphere cross-sectional area follows sample count');
+  assert.deepEqual(node.point,xyz[node.referenceIndex]);
+  const selected=C.stateRows(filtered,context,node.taxon);
+  assert.equal(selected.length,node.n);
+  assert(selected.every(({r,i})=>records[i]===r&&context.samples[i].taxon===node.taxon));
+ }
+ const limited=C.rows(records,{cohort:'LSVF',group:''}),localNodes=C.stateGraph(context,shown,xyz,limited);
+ assert.deepEqual(localNodes.map(t=>t.n),nodes.map(t=>t.n),'Selection and cohort filters do not shrink graph counts');
+ for(const node of localNodes)assert.equal(C.stateRows(limited,context,node.taxon).length,node.filteredCount);
+ assert.deepEqual(C.stateRows(limited,context,''),limited);
+ assert.deepEqual(C.stateRows(filtered,context,'missing'),[]);
+ const savedSelection=C.selection({stateTaxon:nodes[0].taxon,specimen:records[0].sample_id});
+ assert.deepEqual(C.selection(JSON.parse(JSON.stringify(savedSelection))),savedSelection);
  const before=JSON.stringify(context);
  for(let q=1;q<=100;q++){
   const result=C.taxonDisplay(context,q);

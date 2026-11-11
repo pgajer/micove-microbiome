@@ -62,7 +62,9 @@ population and selects the smallest prefix reaching the target. Choices are
 3.5k uses 11 states covering 80.98%, and 4k uses 12 states covering 81.24%.
 Count ties and leading-taxon abundance ties use frozen feature order; neither
 current population has an abundance tie. Remaining samples stay gray as Other
-leading taxa. Changing coverage never filters samples or reassigns their state.
+leading taxa. Changing coverage does not reassign states. With All states selected,
+coverage changes leave every filtered sample plotted; an explicitly selected
+state restricts the sample view as described below.
 This is sample coverage, not the taxon's relative abundance within individual
 samples. No merged labels are generated. The legend's n, % and c% describe displayed samples; marker
 overlays do not enter those counts. Full-population rankings and reference
@@ -74,6 +76,33 @@ shown as an additional saved-view option. Subsequent choices use the new target
 and persist normally. For example, eight states in 3.5k become a 75.68% saved-view
 option. Sample and state CSVs record the target and whether each state/sample is
 in the individually colored set; the remainder remains present in exports.
+
+### Linked pure 1-CST graph
+
+The graph contains one sphere per retained pure 1-CST at the selected coverage.
+Its counts and percentages use the full chosen population, including while a
+cohort, identity group or state is selected. Sphere cross-sectional area is
+proportional to sample count (radius is proportional to its square root), with
+a common adjustable size multiplier. Colors match the pure-state sample colors.
+There are no inferred edges.
+
+Click a sphere or its taxon label to show that state's samples within the current
+cohort and identity filters. The graph remains complete so another state can be
+chosen directly. **All states** restores all samples within those filters;
+**Clear selection** also clears the cohort and identity filters. Back and Forward
+restore state and specimen selections. If reduced coverage excludes the selected
+state, selection clears with an explanatory message. State, layout and size
+preferences persist across reloads and named views. Sample exports include the
+selected state and the coverage target even with a different coloring option.
+
+The default **Frequency grid** places states in frequency order, with legible,
+clickable labels and counts. Positions do not encode biological distances.
+**Observed reference samples · 3D** uses the maximum-abundance reference specimens'
+coordinates in the currently selected sample embedding. These are neither state
+centroids nor a new graph fit. Selecting a state preserves its samples' original
+population coordinates; the sample title identifies the view as a population-fit
+subset. The reported distance error remains that of the full fitted population.
+Both panels can be maximized; on narrow screens the graph sits below the samples.
 
 **Sample appearance → Reference vertices** marks each displayed taxon's observed
 maximum-abundance sample at its saved 3D coordinates. Its label includes the actual
@@ -118,7 +147,10 @@ node rank2_feature_graph/test_comb_mg_population.cjs /path/to/package
 
 Before release, also inspect all 12 saved maps in the browser, both populations,
 residual and denominator labels, 70/400 identity filters, feature coloring,
-metadata inspection, exports, saved choices and an unaffected dataset. Automated
+metadata inspection, exports, saved choices and an unaffected dataset. Check
+state selection, Back/Forward and All states, intersections with cohort/identity
+filters, both graph layouts, normal/maximized views, and clearing a selected
+state when it falls outside the coverage. Automated
 selector tests alone do not establish actual 3D rendering.
 
 ## Historical mean-based release — withdrawn
