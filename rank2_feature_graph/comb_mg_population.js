@@ -36,6 +36,13 @@ const CombMg = (()=>{
   return shown.taxa.map(t=>({...t,point:xyz[t.referenceIndex],fraction:t.n/context.sampleCount,
    radiusFraction:Math.sqrt(t.n/maximum),filteredCount:counts.get(t.taxon)||0}));
  }
+ function localCoordinates(populationXYZ,payload,records,context,taxon){
+  const indices=context.samples.flatMap((s,i)=>s.taxon===taxon?[i]:[]);
+  if(JSON.stringify(payload.indices)!==JSON.stringify(indices)||payload.sampleIds.length!==indices.length||payload.xyz.length!==indices.length||
+    indices.some((i,j)=>payload.sampleIds[j]!==records[i].sample_id)||payload.xyz.some(p=>p.length!==3||!p.every(Number.isFinite)))throw Error('Local fit membership or coordinate axis differs');
+  const xyz=populationXYZ.slice();indices.forEach((i,j)=>{xyz[i]=payload.xyz[j]});return xyz;
+ }
+ function taxonHover(values){return '<br><b>Top 5 taxa · relative abundance</b>'+values.map(([t,f])=>'<br>'+escape(t.replaceAll('_',' '))+': '+(100*f).toFixed(2)+'%').join('')+'<br>% of in-scope taxonomically assigned reads';}
  function selection(s){return {stateTaxon:s.stateTaxon||'',specimen:s.specimen||''}}
  function csv(records){const fields=[...new Set(records.flatMap(Object.keys))];const cell=x=>'"'+String(x??'').replaceAll('"','""')+'"';return [fields,...records.map(r=>fields.map(k=>r[k]))].map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n'}
  async function bytes(d){
@@ -45,7 +52,7 @@ const CombMg = (()=>{
   const h=[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');
   if(h!==d.sha256)throw Error('CAG checksum differs; reload the page.');return b;
  }
- return {populations,constructions,representations,geometries,options,fractionLabel,denominator,ctValue,groups,groupColors,key,rows,validate,escape,csv,bytes,taxonDisplay,taxonCoverageSetting,stateRows,stateGraph,selection};
+ return {populations,constructions,representations,geometries,options,fractionLabel,denominator,ctValue,groups,groupColors,key,rows,validate,escape,csv,bytes,taxonDisplay,taxonCoverageSetting,stateRows,stateGraph,selection,localCoordinates,taxonHover};
 })();
 if(typeof module!=='undefined')module.exports=CombMg;
 async function showCombMgPopulation(data,choices){
@@ -59,7 +66,7 @@ async function showCombMgPopulation(data,choices){
  try{CombMg.validate(data,s)}catch{s={...s,population:data.default.dataset,construction:data.default.construction,representation:data.default.representation,geometry:data.default.normalization+'|'+data.default.target_metric}}
  const available=CombMg.options(data);
  const style=document.createElement('style');style.textContent=`
- .combMg [hidden]{display:none!important}.combMg label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.combMg select,.combMg input{max-width:100%;min-width:0}.combMg small{display:block;line-height:1.4}.combMg details{margin:10px 0;border-top:1px solid #d3e0e5;padding-top:8px}.combMg summary{font-weight:600;cursor:pointer}.combMg table{width:100%;font-size:12px;border-collapse:collapse}.combMg td,.combMg th{padding:4px;border-bottom:1px solid #e0e8eb;text-align:left;overflow-wrap:anywhere}.combMgNotice{padding:8px;background:#fff3d8;border-left:3px solid #d89b28;font-size:12px;line-height:1.4}.combMgStatus{padding:8px;line-height:1.45}.combMgSelected{font-weight:600;color:#a54500}#samplePanel.combMg{height:100%;min-height:520px}#samplePanel.combMg #sampleSidePanels{overflow:auto;flex:0 0 350px;padding:8px 12px;box-sizing:border-box}#samplePanel.combMg #sampleContent{display:flex;flex:1;min-height:0}#samplePanel.combMg #samples{position:relative;flex:1;min-width:120px;height:100%}#samplePanel.combMg #sampleInfoDivider{display:none}.combMg .sampleHeaderActions{flex-wrap:wrap}.combMg dialog{max-width:640px;max-height:85vh;overflow:auto}#samplePanel.combMgExpanded{position:fixed;inset:8px;z-index:1000;height:calc(100vh - 16px)}
+ .combMg [hidden]{display:none!important}.combMg label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.combMg select,.combMg input{max-width:100%;min-width:0}.combMg small{display:block;line-height:1.4}.combMg details{margin:10px 0;border-top:1px solid #d3e0e5;padding-top:8px}.combMg summary{font-weight:600;cursor:pointer}.combMg table{width:100%;font-size:12px;border-collapse:collapse}.combMg td,.combMg th{padding:4px;border-bottom:1px solid #e0e8eb;text-align:left;overflow-wrap:anywhere}#combMgLegend td:not(:first-child),#combMgLegend th:not(:first-child){white-space:nowrap;overflow-wrap:normal}.combMgNotice{padding:8px;background:#fff3d8;border-left:3px solid #d89b28;font-size:12px;line-height:1.4}.combMgStatus{padding:8px;line-height:1.45}.combMgSelected{font-weight:600;color:#a54500}#samplePanel.combMg{height:100%;min-height:520px}#samplePanel.combMg #sampleSidePanels{overflow:auto;flex:0 0 350px;padding:8px 12px;box-sizing:border-box}#samplePanel.combMg #sampleContent{display:flex;flex:1;min-height:0}#samplePanel.combMg #samples{position:relative;flex:1;min-width:120px;height:100%}#samplePanel.combMg #sampleInfoDivider{display:none}.combMg .sampleHeaderActions{flex-wrap:wrap}.combMg dialog{max-width:640px;max-height:85vh;overflow:auto}#samplePanel.combMgExpanded{position:fixed;inset:8px;z-index:1000;height:calc(100vh - 16px)}
  @media(max-width:900px){#samplePanel.combMg #sampleContent{flex-direction:column}#samplePanel.combMg #sampleSidePanels{flex:0 0 260px;width:auto;max-height:35vh}#samplePanel.combMg #samples{min-height:300px;height:auto}}
  #panelWorkspace.combMgWorkspace{display:grid!important;grid-template-columns:minmax(540px,1.5fr) minmax(330px,1fr);grid-template-rows:minmax(520px,1fr);gap:12px;overflow:auto}
  #panelWorkspace.combMgWorkspace>#samplePanel{grid-area:1/1;min-height:520px}
@@ -100,7 +107,7 @@ async function showCombMgPopulation(data,choices){
  const graphPlot=make('div',null,graphPanel);graphPlot.id='combMgStatePlot';graphPlot.hidden=true;
  graphPanel.style.display=data.taxonContext?'':'none';
  const dataSection=$('dataControls'),controls=dataSection.querySelector('.sectionControls');
- const dataset=$('datasetSelect');dataset.disabled=false;dataset.value=data.id;
+ const dataset=$('datasetSelect');dataset.disabled=false;dataset.value=data.id;for(const option of dataset.options)if(option.value===data.id)option.textContent='comb-mg';
  const datasetField=dataset.closest('label')||field('Dataset',dataset,document.createElement('div')).parentElement;
  controls.replaceChildren(datasetField);$('controlSections').replaceChildren(dataSection);dataSection.classList.add('combMg');
  const population=select('combMgPopulation','Population',available.populations,controls);
@@ -138,8 +145,8 @@ async function showCombMgPopulation(data,choices){
  const specimen=select('combMgSpecimen','Inspect sample',[['','Choose a sample']],side);
  const inspection=make('div',null,side);inspection.id='combMgInspection';
  const methods=details('Methods, interpretation and downloads',side);
- make('p','Each point is a sample profile. Selecting a pure 1-CST, cohort or identity group restricts the saved population coordinates; it does not fit a local map. The state graph keeps full-population counts and reference positions. All states clears the state selection while preserving cohort and identity filters. Axes are not aligned across the '+Object.keys(data.maps).length+' independent fits.',methods);
- if(data.taxonContext)make('p','Leading taxon (raw reads) assigns each sample to its most abundant taxon: a pure taxon-level 1-CST. It uses all in-scope taxonomically assigned gene reads, including residual genes, regardless of the displayed CAG representation. States rank by sample count; the smallest set reaching the chosen sample-coverage target receives individual colors. Actual coverage may exceed the target because states are not split. The remaining samples stay gray and are not merged into retained states. Coverage refers to the full chosen population, not the filtered display or within-sample abundance. Taxon-count and leading-abundance ties use frozen feature order. Reference vertices mark observed samples with the largest taxon read fraction across the full selected population; ties use sample order. They are context markers, including when filtered out, and never add to sample counts. These are read fractions, not cell proportions.',methods);
+ make('p','Each point is a sample profile. States reaching 90% coverage have saved local fits when installed; selecting one loads its local map automatically. Remaining states use a labeled population-map subset. Cohort and identity filters restrict the current fit. The graph keeps population counts and reference positions. All states returns to the population map while preserving cohort and identity filters. Axes are not aligned across the '+Object.keys(data.maps).length+' independent fits.',methods);
+ if(data.taxonContext)make('p','Leading taxon (raw reads) assigns each sample to its most abundant taxon: a pure taxon-level 1-CST. It uses all in-scope taxonomically assigned gene reads, including residual genes, regardless of the displayed CAG representation. States rank by sample count; the smallest set reaching the chosen sample-coverage target receives individual colors. Actual coverage may exceed the target because states are not split. The remaining samples stay gray and are not merged into retained states. Coverage refers to the full chosen population, not the filtered display or within-sample abundance. Taxon-count and leading-abundance ties use frozen feature order. Reference vertices mark observed samples with the largest taxon read fraction in the active fit: the selected pure state for local maps, or the full population otherwise. Ties use sample order. They are context markers, including when filtered out, and never add to sample counts. These are read fractions, not cell proportions.',methods);
  for(const caution of data.cautions)make('p',caution,methods);
  make('p',data.abundanceKind==='sum'?'Each feature sums raw counts over its fixed disjoint gene set. No gene averaging or length correction is applied. L1 divides by the sum of included features; max divides by their maximum. CAG-only L1 uses CAG reads, while the inclusive version uses all in-scope gene reads. Removing species_other changes the table and denominator, rather than merely hiding categories.':'Ordinary means: sum of gene counts / number of genes. Length-corrected means: sum of count / nucleotide length, divided by number of genes. L1 divides by the sum of displayed feature values; max divides by their maximum. Common sample denominators cancel. Residual species_other values are means, not sums.',methods);
  const exportCSV=button('combMgCSV','Export displayed samples CSV',methods),exportFeatures=button('combMgFeaturesCSV','Export feature metadata CSV',methods);
@@ -187,6 +194,7 @@ async function showCombMgPopulation(data,choices){
   const r=active.records[i];make('h3',r.sample_id,inspection).className='combMgSelected';
   const md=details('Recorded metadata and holds',inspection,true),table=make('table',null,md);
   for(const [k,v] of Object.entries(r)){const row=make('tr',null,table);make('th',k.replaceAll('_',' '),row);make('td',v||'Unavailable',row)}
+  if(active.taxonTop){const taxa=make('table',null,inspection);make('caption','Top 5 taxa · % of in-scope taxonomically assigned reads',taxa);for(const [taxon,fraction] of active.taxonTop.values[i]){const row=make('tr',null,taxa);make('td',taxon.replaceAll('_',' '),row);make('td',(100*fraction).toFixed(2)+'%',row)}}
   const top=make('table',null,inspection);make('caption','Largest values in the current normalized CAG table',top);
   for(const [j,value] of active.top[i]){const row=make('tr',null,top);make('td',fieldName(active.features[j]),row);make('td',value.toPrecision(5),row)}
  }
@@ -195,13 +203,13 @@ async function showCombMgPopulation(data,choices){
  function selectSample(id,push=true){s.specimen=id;specimen.value=id;if(push)recordSelection();return render()}
  function selectState(taxon){if(taxon&&!active?.shown?.names.has(taxon))return Promise.resolve();s.stateTaxon=taxon;s.specimen='';recordSelection();return render()}
  async function drawStateGraph(model,attempt){
-  const {context,shown,xyz,filtered,key}=model;if(!context)return;
+  const {context,shown,populationXYZ:xyz,filtered,key}=model;if(!context)return;
   const nodes=CombMg.stateGraph(context,shown,xyz,filtered);
   graphTitle.textContent='Pure 1-CST graph · '+Number(shown.targetCoverage.toFixed(2))+'% target';
   graphStatus.textContent=nodes.length+' states · '+shown.actualCoverage.toFixed(2)+'% actual coverage of '+context.sampleCount.toLocaleString()+' samples. '+
    (s.stateTaxon?'Selected: '+s.stateTaxon.replaceAll('_',' ')+'. ':'Click a sphere or its label to select a state. ')+
    'Counts and sphere areas use the full '+s.population+' population; selecting a state preserves the current cohort/identity filters. '+
-   (s.stateGraphLayout==='grid'?'Grid order is by frequency; positions do not encode distances.':'Positions are observed reference specimens in the current sample MDS; no new fit is computed.');
+   (s.stateGraphLayout==='grid'?'Grid order is by frequency; positions do not encode distances.':'Positions are observed reference specimens in the population MDS; no new fit is computed.');
   stateTaxon.replaceChildren(new Option('All states',''),...nodes.map(t=>new Option(t.taxon.replaceAll('_',' ')+' · '+t.n,t.taxon)));stateTaxon.value=s.stateTaxon;
   allStates.disabled=!s.stateTaxon;stateGraphSize._display();
   graphGrid.hidden=s.stateGraphLayout!=='grid';graphPlot.hidden=s.stateGraphLayout!=='references';
@@ -234,7 +242,8 @@ async function showCombMgPopulation(data,choices){
   for(const b of graphGrid.querySelectorAll('button'))b.disabled=true;graphPlot.style.pointerEvents='none';
   summary.textContent='Loading the matching saved map…';plot.style.visibility='hidden';
   try{
-   const [records,features,xyz,top,context]=await Promise.all([json(data.samples[selected.population]),json(table.features),json(map.coordinates),json(table.top),data.taxonContext?.[selected.population]?json(data.taxonContext[selected.population]):null]);
+   const [records,features,populationXYZ,top,context,taxonTop]=await Promise.all([json(data.samples[selected.population]),json(table.features),json(map.coordinates),json(table.top),data.taxonContext?.[selected.population]?json(data.taxonContext[selected.population]):null,data.taxonTop?.[selected.population]?json(data.taxonTop[selected.population]):null]);
+   let xyz=populationXYZ;
    if(attempt!==serial)return;
    if(records.length!==xyz.length||records.length!==table.samples||features.length!==table.featureCount)throw Error('CAG axes do not match');
    if(context&&(context.samples.length!==records.length||context.samples.some((r,i)=>r.sample_id!==records[i].sample_id)))throw Error('Taxon annotation sample axis differs');
@@ -242,6 +251,11 @@ async function showCombMgPopulation(data,choices){
    if(context){s.taxonCoverage=CombMg.taxonCoverageSetting(context,s);delete s.topTaxa}
    const shown=context?CombMg.taxonDisplay(context,s.taxonCoverage):null;
    let selectionNote='';if(s.stateTaxon&&!shown?.names.has(s.stateTaxon)){selectionNote='The previous state is outside the selected coverage; showing all states. ';s.stateTaxon=s.specimen='';resetHistory()}
+   const local=s.stateTaxon?data.localFits?.[key]?.[s.stateTaxon]:null;
+   let fitXYZ=populationXYZ;
+   if(local){const payload=await json(local.coordinates);if(attempt!==serial)return;xyz=CombMg.localCoordinates(populationXYZ,payload,records,context,s.stateTaxon);fitXYZ=payload.xyz}
+   const fittedMap=local||map,fittedCount=fitXYZ.length,frameKey=local?key+'|local|'+s.stateTaxon:key;
+   if(taxonTop&&(taxonTop.sampleIds.length!==records.length||taxonTop.sampleIds.some((id,i)=>id!==records[i].sample_id)))throw Error('Taxon abundance sample axis differs');
    const targets=[10,20,30,40,50,60,70,80,90,95,99,100];
    if(shown&&!targets.includes(shown.targetCoverage))targets.push(shown.targetCoverage);
    taxonCoverage.replaceChildren(...targets.sort((a,b)=>a-b).map(q=>new Option((Number.isInteger(q)?q:q.toFixed(2))+'%'+(Number.isInteger(q)?'':' · saved view'),String(q))));
@@ -258,7 +272,7 @@ async function showCombMgPopulation(data,choices){
    if(s.color==='feature'&&featureIndex>=0){summary.textContent='Loading exact feature values…';values=await matrix(table);if(attempt!==serial)return}
    const traces=[],counts=new Map();legend.replaceChildren();
    const hover=({r,i})=>'<b>'+E(r.sample_id)+'</b><br>'+E(r.study)+' · '+E(CombMg.groups[r.exploratory_group])+'<br>'+E(r.mapping_status||'Mapping unavailable')+
-     '<br>Identity/body-site holds retained'+(context?'<br>Leading taxon: '+E(context.samples[i].taxon.replaceAll('_',' '))+' · '+(100*context.samples[i].fraction).toFixed(2)+'% of in-scope reads':'')+top[i].map(([j,v])=>'<br>'+E(features[j].feature)+': '+v.toPrecision(4)).join('');
+     '<br>Identity/body-site holds retained'+(context?'<br>Leading taxon: '+E(context.samples[i].taxon.replaceAll('_',' '))+' · '+(100*context.samples[i].fraction).toFixed(2)+'% of in-scope reads':'')+(taxonTop?CombMg.taxonHover(taxonTop.values[i]):top[i].map(([j,v])=>'<br>'+E(features[j].feature)+': '+v.toPrecision(4)).join(''));
    const points=new Map();if(s.color==='taxon'&&shown)for(const t of shown.taxa.filter(t=>!s.stateTaxon||t.taxon===s.stateTaxon))points.set(t.taxon.replaceAll('_',' '),{color:trajectoryTaxonColor(t.taxon,{}),rows:[]});
    for(const row of visible){const cat=values?{label:'Feature value',color:null}:categorise(row.r,row.i,context,shown);if(!points.has(cat.label))points.set(cat.label,{...cat,rows:[]});points.get(cat.label).rows.push(row)}
    for(const [label,g] of points){const p=g.rows,marker={size:Number(s.size),opacity:Number(s.opacity),color:values?p.map(({i})=>values[i*features.length+featureIndex]):g.color};
@@ -271,31 +285,31 @@ async function showCombMgPopulation(data,choices){
    showReferences.disabled=!referenceAvailable;for(const n of [sphereReferences,referenceSize,referenceColor,referenceLabelSize])n.disabled=!show;
    for(const n of [referenceAmbient,referenceHighlights])n.disabled=!lit;
    for(const n of [referenceSize,referenceAmbient,referenceHighlights,referenceLabelSize])n._display();
-   referenceNote.textContent=referenceAvailable?'Observed maximum-abundance samples in the full '+s.population+' population. Labels show raw-read fractions. References outside sample filters remain as context and are excluded from counts.':'Choose Leading taxon (raw reads) to display its reference vertices.';
+   referenceNote.textContent=referenceAvailable?'Observed maximum-abundance samples in '+(local?'the selected pure 1-CST':'the full '+s.population+' population')+'. Labels show actual raw-read fractions. References outside cohort/identity filters remain as context and are excluded from counts.':'Choose Leading taxon (raw reads) to display its reference vertices.';
    const annotations=[];
-   if(show){const span=Math.max(...[0,1,2].map(j=>Math.max(...xyz.map(p=>p[j]))-Math.min(...xyz.map(p=>p[j]))))||1,diameter=5*Number(s.referenceSize)/100;
-    shown.taxa.filter(t=>!s.stateTaxon||t.taxon===s.stateTaxon).forEach((t,i)=>{const p=xyz[t.referenceIndex],label=t.taxon.replaceAll('_',' ')+' ('+(100*t.referenceFraction).toFixed(2)+'%)';
-     const h=E(label)+'<br>Observed reference: '+E(t.referenceSample)+'<br>Maximum across '+records.length+' samples';
+   if(show){const span=Math.max(...[0,1,2].map(j=>Math.max(...fitXYZ.map(p=>p[j]))-Math.min(...fitXYZ.map(p=>p[j]))))||1,diameter=5*Number(s.referenceSize)/100;
+    (local?[local.reference]:shown.taxa.filter(t=>!s.stateTaxon||t.taxon===s.stateTaxon)).forEach((t,i)=>{const p=xyz[t.referenceIndex],label=t.taxon.replaceAll('_',' ')+' ('+(100*t.referenceFraction).toFixed(2)+'%)';
+     const h=E(label)+'<br>Observed reference: '+E(t.referenceSample)+'<br>Maximum across '+fittedCount+' '+(local?'samples in this pure 1-CST':'population samples');
      annotations.push({x:p[0],y:p[1],z:p[2],text:label,ax:i%2?18:-18,ay:i%3? -18:18,xanchor:i%2?'left':'right',showarrow:true,arrowhead:0,arrowwidth:1,arrowcolor:'#78909c',bgcolor:'rgba(255,255,255,.8)',font:{size:Number(s.referenceLabelSize),color:'#173846'}});
      if(lit)traces.push({...vertexSphereMesh(p,diameter*span/600,{ambient:Number(s.referenceAmbient),highlights:Number(s.referenceHighlights)}),color:s.referenceColor,text:h,hovertemplate:'%{text}<extra></extra>',meta:{combMgReference:t.taxon},showlegend:false});
      else traces.push({type:'scatter3d',mode:'markers',x:[p[0]],y:[p[1]],z:[p[2]],marker:{size:diameter,color:s.referenceColor,symbol:'diamond'},text:[h],hovertemplate:'%{text}<extra></extra>',meta:{combMgReference:t.taxon},showlegend:false});
     });
    }
-   const layout={margin:{l:0,r:values?80:0,t:0,b:0},showlegend:false,paper_bgcolor:'white',uirevision:key,
-    scene:{aspectmode:'data',camera:cameras[key],annotations,xaxis:{visible:false},yaxis:{visible:false},zaxis:{visible:false}}};
+   const layout={margin:{l:0,r:values?80:0,t:0,b:0},showlegend:false,paper_bgcolor:'white',uirevision:frameKey,
+    scene:{aspectmode:'data',camera:cameras[frameKey],annotations,xaxis:{visible:false},yaxis:{visible:false},zaxis:{visible:false}}};
    await Plotly.react(plot,traces,layout,{responsive:true,displaylogo:false,displayModeBar:false});if(attempt!==serial)return;
-   currentFrame=key;plot.style.visibility='visible';
+   currentFrame=frameKey;plot.style.visibility='visible';
    // A user can change a control while the first asset request is pending.
    // Install picking after the first completed render, including a replacement render.
    if(!pickingInstalled){installAgpGraphPicking(plot,item=>selectSample(item.id).catch(console.error),()=>serial);plot.on('plotly_relayout',()=>persist());pickingInstalled=true}
-   const model={records,features,xyz,top,visible,filtered,map,table,key,context,shown};
+   const model={records,features,xyz,populationXYZ,top,taxonTop,visible,filtered,map,local,fittedMap,fittedCount,table,key,frameKey,context,shown};
    await drawStateGraph(model,attempt);if(attempt!==serial)return;active=model;stateTaxon.disabled=false;graphPlot.style.pointerEvents='';
    for(const n of [exportCSV,exportFeatures,accountingCSV,taxonCSV,png])n.disabled=false;
    denominatorNote.textContent=CombMg.denominator(selected,table);denominatorNote.hidden=!denominatorNote.textContent;
-   $('sampleTitle').textContent='Combined metagenomes · '+selected.population+' · '+selected.construction+(s.stateTaxon?' · Pure 1-CST: '+s.stateTaxon.replaceAll('_',' ')+' · Population fit subset':'');
-   stress.textContent='RMS relative error: '+map.rmsRelativeErrorPercent.toFixed(2)+'% (all pairs)'+(visible.length!==records.length?' · full fitted population':'');
-   stress.title='Click for the definition. Subsets restrict population coordinates; the displayed error belongs to the full fitted population.';
-   summary.textContent=visible.length.toLocaleString()+' displayed sample profiles / '+records.length.toLocaleString()+' in this fit · '+features.length.toLocaleString()+' features. '+
+   $('sampleTitle').textContent='comb-mg · '+selected.population+' · '+selected.construction+(s.stateTaxon?' · Pure 1-CST: '+s.stateTaxon.replaceAll('_',' ')+(local?' · Local 3D MDS':' · Population fit subset'):'');
+   stress.textContent='RMS relative error: '+fittedMap.rmsRelativeErrorPercent.toFixed(2)+'% (all pairs)'+(visible.length!==fittedCount?' · full fitted '+(local?'state':'population'):'');
+   stress.title='Click for the definition. Error covers all pairs in the fitted '+(local?'pure 1-CST':'population')+', before cohort or identity filters.';
+   summary.textContent=visible.length.toLocaleString()+' displayed sample profiles / '+fittedCount.toLocaleString()+' in this fit · '+features.length.toLocaleString()+' features. '+
     (s.stateTaxon?'Selected pure 1-CST: '+s.stateTaxon.replaceAll('_',' ')+'. ':'')+selectionNote+(s.group?CombMg.groups[s.group]+'. ':'')+'Exploratory; identity and body-site holds remain.';
    if(context)taxonNote.textContent='Target '+Number(shown.targetCoverage.toFixed(2))+'% · actual '+shown.actualCoverage.toFixed(2)+'% ('+shown.n.toLocaleString()+' / '+records.length.toLocaleString()+' samples) in the '+shown.taxa.length+' largest pure 1-CSTs of the full '+s.population+' population. '+(s.color==='taxon'?'Gray = other leading taxa. ':'This coverage controls the pure 1-CST graph. ')+(s.stateTaxon?'Showing the selected state within the current filters. ':'All filtered samples stay plotted. ')+'Legend n and % count displayed samples; reference markers are excluded.';
    const legendTable=make('table',null,legend),head=make('tr',null,make('thead',null,legendTable));for(const t of ['Category','n','%','c%'])make('th',t,head);const body=make('tbody',null,legendTable);let cumulative=0;
@@ -318,23 +332,23 @@ async function showCombMgPopulation(data,choices){
  max.onclick=()=>{panel.classList.toggle('combMgExpanded');max.textContent=panel.classList.contains('combMgExpanded')?'Restore':'⛶ Maximize';requestAnimationFrame(()=>Plotly.Plots.resize(plot))};
  graphMax.onclick=()=>{graphPanel.classList.toggle('combMgExpanded');graphMax.textContent=graphPanel.classList.contains('combMgExpanded')?'Restore':'⛶ Maximize';if(!graphPlot.hidden)requestAnimationFrame(()=>Plotly.Plots.resize(graphPlot))};
  function download(raw,name,type){for(const old of downloadArea.querySelectorAll('a'))URL.revokeObjectURL(old.href);downloadArea.replaceChildren();const a=make('a','Download '+name,downloadArea);a.href=URL.createObjectURL(new Blob([raw],{type}));a.download=name;a.style.display='block';a.click()}
- exportCSV.onclick=()=>{if(!active)return;const records=active.visible.map(({r,i})=>({...r,x:active.xyz[i][0],y:active.xyz[i][1],z:active.xyz[i][2],map:active.key,coordinate_metric:'euclidean',target_metric:active.map.targetMetric,
+ exportCSV.onclick=()=>{if(!active)return;const records=active.visible.map(({r,i})=>({...r,x:active.xyz[i][0],y:active.xyz[i][1],z:active.xyz[i][2],map:active.frameKey,fitting_scope:active.local?'local pure 1-CST':'population',fit_sample_count:active.fittedCount,fit_rms_relative_error_percent:active.fittedMap.rmsRelativeErrorPercent,coordinate_metric:'euclidean',target_metric:active.map.targetMetric,
   ...(active.context?{leading_taxon_raw:active.context.samples[i].taxon,leading_taxon_raw_read_fraction:active.context.samples[i].fraction,leading_taxon_tie:active.context.samples[i].tied}:{}),
   ...(active.context?{pure_1cst_target_coverage_percent:active.shown.targetCoverage,pure_1cst_in_color_set:active.shown.names.has(active.context.samples[i].taxon)}:{}),selected_pure_1cst:s.stateTaxon,full_population_rms_relative_error_percent:active.map.rmsRelativeErrorPercent,source_contract_sha256:identity}));download(CombMg.csv(records),'comb-mg-displayed-samples.csv','text/csv')};
  exportFeatures.onclick=()=>active&&download(CombMg.csv(active.features),'comb-mg-feature-metadata.csv','text/csv');
  accountingCSV.onclick=async()=>{if(active?.table.accounting)download(CombMg.csv(await json(active.table.accounting)),'comb-mg-retained-read-accounting.csv','text/csv')};
  taxonCSV.onclick=()=>{if(!active?.context)return;let n=0;download(CombMg.csv(active.context.taxa.map((t,i)=>{n+=t.n;return {...t,rank:i+1,percent:100*t.n/active.records.length,cumulative_percent:100*n/active.records.length,denominator:active.context.denominator,target_coverage_percent:active.shown.targetCoverage,in_color_set:active.shown.names.has(t.taxon)}})),'comb-mg-pure-1cst-counts-and-references.csv','text/csv')};
  const dialog=make('dialog',null,panel),dialogBody=make('div',null,dialog),close=button('combMgDialogClose','Close',dialog);close.onclick=()=>dialog.close();
- stress.onclick=()=>{dialogBody.innerHTML='<h3>How closely does the 3D map preserve target distances?</h3><p>RMS relative distance error is</p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mn>100</mn><mo>×</mo><msqrt><mrow><mfrac><mn>1</mn><mi>M</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>&lt;</mo><mi>j</mi></mrow><mrow/></munderover><msup><mrow><mo>(</mo><mfrac><mrow><msub><mi>d</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>δ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><msub><mi>δ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow></msqrt><mo>%</mo></mrow></math><p>δ is the target distance between full normalized CAG profiles; d is their Euclidean distance in the saved 3D map. M is the number of unordered sample pairs. All pairs have positive targets. Smaller errors indicate closer distance approximation, not greater biological validity.</p><p>Each map used full metric MDS with SGD, inverse-squared target weights, one PCA start, seed 20261015 and 200 epochs. Best saved epoch: '+active?.map.bestEpoch+'. Convergence was not certified. The error refers to the full fitted population, including when only a cohort or identity group is visible.</p>';dialog.showModal()};
+ stress.onclick=()=>{dialogBody.innerHTML='<h3>How closely does the 3D map preserve target distances?</h3><p>RMS relative distance error is</p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mn>100</mn><mo>×</mo><msqrt><mrow><mfrac><mn>1</mn><mi>M</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>&lt;</mo><mi>j</mi></mrow><mrow/></munderover><msup><mrow><mo>(</mo><mfrac><mrow><msub><mi>d</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>δ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><msub><mi>δ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow></msqrt><mo>%</mo></mrow></math><p>δ is the target distance between full normalized CAG profiles; d is their Euclidean distance in the saved 3D map. M is the number of unordered sample pairs. All pairs have positive targets. Smaller errors indicate closer distance approximation, not greater biological validity.</p><p>Each map used full metric MDS with SGD, inverse-squared target weights, one start ('+E(active?.local?active.local.settings.initialization:'PCA')+'), seed 20261015 and 200 epochs. Best saved epoch: '+active?.fittedMap.bestEpoch+'. Completing the epoch budget is not a convergence certificate. The error refers to all '+active?.fittedCount+' samples in the fitted '+(active?.local?'pure 1-CST':'population')+', before cohort/identity filters. Local fits choose the lower relative-error starting map from scaled PCA and scaled population coordinates.</p>';dialog.showModal()};
  named.onclick=()=>{dialogBody.replaceChildren();make('h3','Named views · comb-mg',dialogBody);const name=make('input');field('Name',name,dialogBody);const list=select('combMgNamedList','Saved view',namedViews.map((v,i)=>[String(i),v.name]),dialogBody);
   button('combMgSaveNamed','Save current view',dialogBody).onclick=()=>{if(!name.value.trim())return;persist();namedViews.push({name:name.value.trim(),identity,settings:{...s},cameras:JSON.parse(JSON.stringify(cameras))});persist();dialog.close()};
   button('combMgLoadNamed','Restore selected view',dialogBody).onclick=async()=>{const v=namedViews[Number(list.value)];if(!v||v.identity!==identity)return;CombMg.validate(data,v.settings);s={...defaults,...v.settings};cameras={...v.cameras};restoreControls();resetHistory();currentFrame=graphFrame=null;dialog.close();await render()};dialog.showModal()};
  const pngOpen=installPngExportDialog($,async()=>{if(!active)throw Error('Wait for the saved map');return {data:plot.data,layout:{...plot.layout,scene:pngExportScene(plot,plot._fullLayout.scene._scene.getCamera())},
-  width:Math.max(500,plot.clientWidth),height:Math.max(400,plot.clientHeight),title:$('sampleTitle').textContent,filename:'micove-comb-mg-'+active.key.replaceAll('|','-'),
+  width:Math.max(500,plot.clientWidth),height:Math.max(400,plot.clientHeight),title:$('sampleTitle').textContent,filename:'micove-comb-mg-'+active.frameKey.replaceAll('|','-'),
   rows:[{text:representation.selectedOptions[0].textContent},{text:geometry.selectedOptions[0].textContent},{text:summary.textContent},...(s.color==='taxon'?[{text:taxonNote.textContent}]:[]),{text:stress.textContent},{text:'Exploratory CAG compositions; not cell proportions. Identity and body-site holds remain.'}]}});
  $('viewExportClose').disabled=false;png.onclick=()=>pngOpen('samples');
  await render();
  window.addEventListener('pagehide',persist);
- document.title='MiCOVE — Combined metagenomes';
+ document.title='MiCOVE — comb-mg';
 }
 if(typeof window!=='undefined')window.showCombMgPopulation=showCombMgPopulation;

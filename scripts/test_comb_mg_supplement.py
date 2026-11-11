@@ -26,6 +26,10 @@ class GuardTests(unittest.TestCase):
         b=context['taxa'][1]
         self.assertEqual(b['referenceSample'],'tied')  # B need not dominate its maximum-abundance sample.
         self.assertEqual(b['referenceFraction'],0.5)
+        top=c.taxon_top(counts,features,records)
+        self.assertEqual(top['sampleIds'],['a','b','tied'])
+        self.assertEqual(top['values'][0],[['A',10/19],['B',9/19],['C',0]])
+        self.assertEqual(top['values'][2],[['A',.5],['B',.5],['C',0]])
         np.testing.assert_array_equal(counts,[[6,4,9,0],[2,2,5,4],[5,0,5,0]])
 
     def test_distinct_reviewed_releases(self):
@@ -80,6 +84,13 @@ class GuardTests(unittest.TestCase):
             self.assertFalse(c.annotation_upgrade(new,old,root,root))
             changed=entry(dict(base,maps={'one':{'coordinates':'changed'}},taxonContext={'population':'annotation'}))
             self.assertFalse(c.annotation_upgrade(old,changed,root,root))
+            base=dict(base,title='Combined metagenomes · CAG compositions',capabilities={'localFits':False},taxonContext={'population':'annotation'})
+            old=entry(base)
+            enriched=dict(base,title='comb-mg',capabilities={'localFits':True},localFits={'one':'new map'},taxonTop={'population':'top five'},localFitCoverage={'population':90})
+            local=entry(enriched)
+            self.assertTrue(c.annotation_upgrade(old,local,root,root))
+            self.assertFalse(c.annotation_upgrade(local,old,root,root))
+            self.assertFalse(c.annotation_upgrade(local,entry(dict(enriched,localFits={'one':'changed map'})),root,root))
 
 
 @unittest.skipUnless(os.environ.get('MICOVE_COMB_MG_PACKAGE'),'Set MICOVE_COMB_MG_PACKAGE for full saved-data checks')
@@ -105,7 +116,8 @@ class SavedDataTests(unittest.TestCase):
         self.assertEqual(sum(r['exploratory_group']=='unresolved_400' for r in records['4k']),400)
         self.assertTrue(all(not r['visit_id'] for r in records['4k']))
         self.assertTrue(all(r['study']=='unresolved' and not r['participant_id'] for r in records['4k'][3544:]))
-        self.assertFalse(any(data['capabilities'][k] for k in ['taxonCST','valencia','trajectories','localFits']))
+        self.assertFalse(any(data['capabilities'][k] for k in ['taxonCST','valencia','trajectories']))
+        self.assertEqual(data['capabilities']['localFits'],bool(data.get('localFits')))
         for pop,d in data.get('taxonContext',{}).items():
             context=json.loads(p.checked_bytes(root,d));ids=[r['sample_id'] for r in records[pop]]
             self.assertEqual([r['sample_id'] for r in context['samples']],ids)

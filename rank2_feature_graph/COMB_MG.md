@@ -1,8 +1,8 @@
-# Combined metagenomic CAG compositions
+# comb-mg
 
 ## Current release: disjoint AZ sums
 
-The current optional `comb-mg` release contains **12 saved 3D maps**: two
+The current optional `comb-mg` release contains **12 population 3D maps**, plus an optional bank of **264 local pure 1-CST maps**: two
 populations, two abundance definitions and three geometries. It replaces the
 withdrawn mean-based release. Older sums based on overlapping gene memberships
 are not substituted. No models are fitted during installation or viewing.
@@ -98,17 +98,18 @@ selected state and the coverage target even with a different coloring option.
 The default **Frequency grid** places states in frequency order, with legible,
 clickable labels and counts. Positions do not encode biological distances.
 **Observed reference samples · 3D** uses the maximum-abundance reference specimens'
-coordinates in the currently selected sample embedding. These are neither state
-centroids nor a new graph fit. Selecting a state preserves its samples' original
-population coordinates; the sample title identifies the view as a population-fit
-subset. The reported distance error remains that of the full fitted population.
+coordinates in the corresponding population embedding. These are neither state
+centroids nor a new graph fit. Graph positions remain unchanged when a local
+sample map opens.
 Both panels can be maximized; on narrow screens the graph sits below the samples.
 
 **Sample appearance → Reference vertices** marks each displayed taxon's observed
 maximum-abundance sample at its saved 3D coordinates. Its label includes the actual
 raw-read fraction; it is not a hypothetical pure-taxon corner or state centroid.
-The maximum is searched over the full selected population, including specimens
-where another taxon dominates. Equal maxima use frozen sample order. References
+In population views, the maximum is searched over the full selected population,
+including specimens where another taxon dominates. In local views it is searched
+within the selected state, so its reference has coordinates in that fit. The
+actual abundance appears in the label; the population graph references stay fixed. Equal maxima use frozen sample order. References
 outside current sample filters remain as labeled context without adding samples.
 Show reference vertices, Sphere vertices, Vertex size/color, Ambient light,
 Highlights and label-size controls match the ordinary sample viewer and persist
@@ -120,6 +121,46 @@ The optional annotation adds content-addressed assets to a new package while
 preserving every existing map, abundance table and metadata record. An installed
 unannotated package can be upgraded only when those scientific fields are exactly
 identical. Older packages remain usable, with the extra coloring option absent.
+
+### Local pure 1-CST maps and taxon hover values
+
+The local supplement fits the 22 most frequent states reaching 90% coverage in
+each population: 3,213/3,544 profiles (90.66%) and 3,635/4,014 (90.56%). Each
+membership has six maps: both summed-CAG definitions under L1–Euclidean,
+max–Euclidean and max–L∞. These 264 saved maps use the unchanged normalized
+feature tables; pure-state membership always comes from inclusive taxon read
+counts. A fit is reused at every coverage containing its state.
+
+Selecting a sphere loads **Local 3D MDS** automatically. Cohort and identity
+filters restrict that full-state map. **All states** returns to the population
+map. States beyond the fitted coverage retain a labelled **Population fit subset**.
+Navigation, named views, sample inspection and export use the active coordinates.
+CSV exports distinguish local versus population fitting and report the active
+fit's error separately from the full-population error. No fitting occurs in the
+browser or the ordinary update command.
+
+Local fitting uses full `grip::metric.mds()` with SGD, 3D Euclidean output,
+inverse-squared target weights, one start, seed 20261015 and 200 epochs. We compare
+PCA and restricted population starting coordinates after optimizing their common
+scale for relative error, then fit from the lower-error start. Independent SciPy
+calculations check every unordered pair in the original normalized input space.
+Publication requires positive target distances, finite coordinates, exact sample
+joins and relative error no higher than the population subset. A completed epoch
+budget does not certify convergence or biological accuracy. Independent local
+maps have no common orientation; their locations should not be compared directly.
+
+Hovering a sample shows its five largest taxon read fractions, including residual
+genes in the denominator. These values stay identical across CAG definitions and
+geometries. They are not the five largest CAGs and are not calibrated cell fractions.
+The inspection panel retains the normalized CAG values alongside the taxon table.
+
+Maintainers can reproduce local fitting with `scripts/comb_mg_local.py`: `prepare`
+checks a saved package and freezes state inputs; `run` uses a replenished,
+resource-bounded queue; `verify` independently checks saved coordinates; `pack`
+publishes a new immutable supplement. Supply an isolated optimized grip library
+and its `runtime.json` source/build checksums. Runtime/input hashes, solver metadata,
+restartable R fits and per-task validation receipts stay with the numerical outputs.
+The public source contains no dataset, and ordinary updates never launch these jobs.
 
 ### Installation and verification
 

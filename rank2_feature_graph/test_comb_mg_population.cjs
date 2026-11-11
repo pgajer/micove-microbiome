@@ -55,7 +55,26 @@ if(data.abundanceKind==='sum'){
  assert.equal(C.fractionLabel({representation:'sum_other',geometry:'l1|euclidean'}),'Fraction of in-scope reads');
  assert.equal(C.fractionLabel({representation:'sum_cag',geometry:'l1|euclidean'}),'Fraction of CAG reads');
  assert.equal(C.fractionLabel({representation:'sum_cag',geometry:'max|linf'}),'Max-scaled value');
- assert.throws(()=>C.validate(data,{population:'3.5k',construction:'AZ',representation:'mean',geometry:'l1|euclidean'}),/unavailable/);
+ for(const [key,states] of Object.entries(data.localFits||{})){
+ const pop=key.split('|')[0],records=read(data.samples[pop]),context=read(data.taxonContext[pop]);
+ const population=read(data.maps[key].coordinates),before=JSON.stringify(population);
+ assert.equal(Object.keys(states).length,22);
+ for(const [taxon,bank] of Object.entries(states)){
+  const payload=read(bank.coordinates),xyz=C.localCoordinates(population,payload,records,context,taxon);
+  assert.equal(payload.indices.length,bank.n);
+  assert(bank.rmsRelativeErrorPercent<=bank.populationSubsetErrorPercent+1e-6);
+  const selected=new Set(payload.indices);for(let i=0;i<records.length;i++)if(!selected.has(i))assert.equal(xyz[i],population[i]);
+  assert(payload.indices.every((i,j)=>xyz[i]===payload.xyz[j]));
+  assert(selected.has(bank.reference.referenceIndex));
+  const wrong={...payload,sampleIds:payload.sampleIds.map((id,i)=>i===0?'wrong':id)};
+  assert.throws(()=>C.localCoordinates(population,wrong,records,context,taxon),/axis differs/);
+  const swapped={...payload,indices:[...payload.indices].reverse()};
+  assert.throws(()=>C.localCoordinates(population,swapped,records,context,taxon),/axis differs/);
+ }
+ assert.equal(JSON.stringify(population),before);
+}
+assert(C.taxonHover([['A_<B>',.12345]]).includes('A &lt;B&gt;: 12.35%'));
+assert.throws(()=>C.validate(data,{population:'3.5k',construction:'AZ',representation:'mean',geometry:'l1|euclidean'}),/unavailable/);
 }
 for(const [population] of options.populations)for(const [construction] of options.constructions)for(const [representation] of options.representations)for(const [geometry] of options.geometries){
  const s={population,construction,representation,geometry,cohort:'',group:''},bank=C.validate(data,s),records=read(data.samples[population]);

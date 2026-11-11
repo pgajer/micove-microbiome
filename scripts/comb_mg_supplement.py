@@ -90,6 +90,22 @@ def taxon_context(counts, features, records):
         referenceScope='Full selected population, including samples outside cohort/identity filters')
 
 
+def taxon_top(counts, features, records):
+    """Top five taxa on the inclusive raw-read axis; ties use feature order."""
+    import numpy as np
+    taxa = list(dict.fromkeys(f['taxon'] for f in features))
+    require(all(taxa), 'Missing taxonomic annotation')
+    totals = np.column_stack([counts[:, [j for j, f in enumerate(features) if f['taxon'] == taxon]].sum(axis=1)
+                              for taxon in taxa])
+    den = counts.sum(axis=1)
+    require((den > 0).all() and np.isfinite(counts).all() and (counts >= 0).all()
+            and np.array_equal(totals.sum(axis=1), den), 'Taxon read accounting mismatch')
+    order = np.argsort(-totals, axis=1, kind='stable')[:, :5]
+    return dict(sampleIds=[r['sample_id'] for r in records],
+        values=[[[taxa[j], float(totals[i,j]/den[i])] for j in row] for i,row in enumerate(order)],
+        denominator='All in-scope taxonomically assigned raw gene reads, including species_other')
+
+
 def prepare(source, output):
     """Serial bounded conversion of saved maps/tables to lazy HTTP assets."""
     import numpy as np
@@ -121,7 +137,7 @@ def prepare(source, output):
             desc = dict(url=url, sha256=digest, bytes=len(raw)); descriptors[url] = desc
             return desc
         def js(value): return publish(p.encoded(value), '.json')
-        data = dict(id=ID, revision=spec['revision'], title='Combined metagenomes · CAG compositions', abundanceKind=spec['kind'],
+        data = dict(id=ID, revision=spec['revision'], title='comb-mg', abundanceKind=spec['kind'],
                     sourceContractSha256=pin, default=contract['default'], maps={}, tables={}, samples={},
                     capabilities=dict(taxonCST=False, valencia=False, trajectories=False, localFits=False,
                                       cagFeatures=True, sampleMetadata=True),
@@ -191,6 +207,7 @@ def prepare(source, output):
                         context['source'] = dict(rawCountsSha256=sha_file(folder/'raw_counts.npy'),
                                                 featuresSha256=sha_file(r['features_tsv']), samplesSha256=sha_file(r['samples_tsv']))
                         data.setdefault('taxonContext', {})[r['dataset']] = js(context)
+                        data.setdefault('taxonTop', {})[r['dataset']] = js(taxon_top(counts, features, records))
                     del counts
                 # Stable feature order resolves display-only ties. No abundance changes.
                 top = np.argsort(-a, axis=1, kind='stable')[:, :5]
@@ -241,7 +258,52 @@ def package(directory):
     for d in p.descriptors(m['entry']):
         f = p.asset_path(directory, d)
         require(f.stat().st_size == d['bytes'] and sha_file(f) == d['sha256'], 'Changed comb-mg asset: ' + str(f))
+    data = json.loads(p.checked_bytes(directory,m['entry']['parts'][0]))['combMgPopulation']
+    validate_annotations(data, directory, v)
     return m['entry']
+
+
+def validate_annotations(data, directory, receipt):
+    def read(d):return json.loads(p.checked_bytes(directory,d))
+    contexts = {pop:read(d) for pop,d in data.get('taxonContext',{}).items()}
+    records = {pop:read(d) for pop,d in data['samples'].items()}
+    for pop,d in data.get('taxonTop',{}).items():
+        top = read(d);context=contexts[pop]
+        require(top['sampleIds']==[r['sample_id'] for r in records[pop]] and len(top['values'])==len(records[pop]), 'Taxon abundance axis mismatch')
+        for values,leading in zip(top['values'],context['samples']):
+            require(len(values)==5 and len({t for t,f in values})==5
+                and all(isinstance(t,str) and math.isfinite(f) and 0<=f<=1 for t,f in values)
+                and all(values[i][1]>=values[i+1][1] for i in range(4)) and sum(f for t,f in values)<=1+1e-12
+                and values[0][0]==leading['taxon'] and abs(values[0][1]-leading['fraction'])<1e-12, 'Invalid top-five taxon fractions')
+    if not data.get('localFits'):
+        require(not data['capabilities']['localFits'], 'Local fit capability without maps')
+        return
+    require(data['capabilities']['localFits'] and receipt.get('localFits',{}).get('passed') is True, 'Missing local-fit validation')
+    require(set(data['localFits'])==set(data['maps']), 'Incomplete local geometries')
+    count=0
+    for key,bank in data['localFits'].items():
+        pop=key.split('|')[0];context=contexts[pop];chosen=[];n=0
+        for t in context['taxa']:
+            chosen.append(t['taxon']);n+=t['n']
+            if 100*n>=90*len(records[pop]):break
+        require(set(bank)==set(chosen), 'Local state coverage differs')
+        for taxon,fit in bank.items():
+            count+=1;payload=read(fit['coordinates'])
+            indices=[i for i,s in enumerate(context['samples']) if s['taxon']==taxon]
+            require(payload['indices']==indices and payload['sampleIds']==[records[pop][i]['sample_id'] for i in indices]
+                and len(payload['xyz'])==fit['n']==len(indices)
+                and all(len(x)==3 and all(math.isfinite(v) for v in x) for x in payload['xyz']), 'Local map axis mismatch')
+            require(fit['pairs']==len(indices)*(len(indices)-1)//2 and fit['coordinateMetric']=='euclidean'
+                and fit['targetMetric']==data['maps'][key]['targetMetric'], 'Local target/pair mismatch')
+            require(math.isfinite(fit['rmsRelativeErrorPercent']) and 0<=fit['rmsRelativeErrorPercent']<=fit['populationSubsetErrorPercent']+1e-6,
+                'Local error did not pass population comparison')
+            settings=fit['settings']
+            require(settings['backend']=='sgd' and settings['approximation']=='full' and settings['epochs']==200
+                and settings['starts']==1 and settings['pair_weights']=='inverse_squared', 'Local solver settings differ')
+            ref=fit['reference'];i=max(indices,key=lambda i:context['samples'][i]['fraction'])
+            require(ref['referenceIndex']==i and ref['referenceSample']==records[pop][i]['sample_id']
+                and ref['taxon']==taxon and ref['referenceFraction']==context['samples'][i]['fraction'], 'Local reference mismatch')
+    require(count==receipt['localFits']['count'], 'Local verification count differs')
 
 
 def viewer_bytes():
@@ -255,12 +317,24 @@ def viewer_bytes():
 def annotation_upgrade(old, new, old_root, new_root):
     """Allow additive annotations only when every existing scientific field is identical."""
     if old == new: return True
-    if {k:v for k,v in old.items() if k not in ('parts','resources')} != {k:v for k,v in new.items() if k not in ('parts','resources')}: return False
+    def named(entry):
+        entry = {k:v for k,v in entry.items() if k not in ('parts','resources')}
+        entry = json.loads(json.dumps(entry))
+        title = entry.get('dataset',{}).get('title')
+        if title and (title.startswith('Combined metagenomes') or title == 'comb-mg'):entry['dataset']['title']='comb-mg'
+        return entry
+    if named(old) != named(new):return False
     if len(old['parts']) != 1 or len(new['parts']) != 1: return False
     a = json.loads(p.checked_bytes(old_root, old['parts'][0]))['combMgPopulation']
     b = json.loads(p.checked_bytes(new_root, new['parts'][0]))['combMgPopulation']
-    if 'taxonContext' in a or not b.get('taxonContext'): return False
-    return a == {k:v for k,v in b.items() if k != 'taxonContext'} and all(d in new['resources'] for d in old['resources'])
+    # Existing scientific fields, including any earlier local fit, are immutable.
+    for field in ('taxonContext','taxonTop','localFits','localFitCoverage'):
+        if field in a and a[field] != b.get(field):return False
+        if field not in a:b.pop(field,None)
+    if b.get('title') == 'comb-mg' and a.get('title','').startswith('Combined metagenomes'):a['title']='comb-mg'
+    if a.get('capabilities',{}).get('localFits') is False and b.get('capabilities',{}).get('localFits') is True:
+        b['capabilities']['localFits']=False
+    return a == b and all(d in new['resources'] for d in old['resources'])
 
 
 def attach(page, directory):

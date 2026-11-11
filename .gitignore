@@ -206,3 +206,7 @@
 !/rank2_feature_graph/comb_mg_population.js
 !/rank2_feature_graph/test_comb_mg_population.cjs
 !/rank2_feature_graph/COMB_MG.md
+
+!/scripts/comb_mg_local.py
+
+!/scripts/comb_mg_local_mds.R

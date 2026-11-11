@@ -63,8 +63,12 @@ membership, counts or saved coordinates; no merged states are inferred.
 The linked pure 1-CST graph uses the same retained states and taxon colors,
 with sphere area proportional to full-population sample count. Graph counts
 remain fixed under selection and cohort/identity filters. Clicking a sphere
-restricts the sample view to that state within the current filters, without
-changing coordinates or labels. The frequency grid has no distance meaning;
+selects that state within the current filters and loads its saved local fit when
+available; labels and membership remain fixed. The 22 states reaching 90% in each
+population have local fits for both abundance definitions and all three geometries.
+Local sample references use the observed maximum within the selected state,
+with its actual read fraction; population graph references remain unchanged.
+Sample hover shows the top five taxon fractions from inclusive raw read counts. The frequency grid has no distance meaning;
 the optional 3D layout uses the existing observed reference coordinates.
 No inter-state edges are inferred.
 See [the CAG dataset contract](rank2_feature_graph/COMB_MG.md).
